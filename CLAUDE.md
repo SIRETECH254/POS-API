@@ -95,6 +95,48 @@ Each controller function has:
 - **Inside:** step comments within the try body
 - Return type is always `Promise<void>`
 
+**Enforced style rules:**
+
+1. **`if` body always on its own line — never inline:**
+   ```typescript
+   // ✅ correct
+   if (isActive !== undefined) {
+     role.isActive = isActive;
+   }
+
+   // ❌ wrong
+   if (isActive !== undefined) role.isActive = isActive;
+   ```
+
+2. **Each validation guard is independent — never combine conditions with `||` or `&&`:**
+   ```typescript
+   // ✅ correct
+   if (!name) {
+     return next(errorHandler(400, "Name is required"));
+   }
+   if (!description) {
+     return next(errorHandler(400, "Description is required"));
+   }
+
+   // ❌ wrong
+   if (!name || !description) {
+     return next(errorHandler(400, "Name and description are required"));
+   }
+   ```
+
+3. **All `res.json()` responses are multi-line — never compressed to one line:**
+   ```typescript
+   // ✅ correct
+   res.status(201).json({
+     success: true,
+     message: "Item created successfully",
+     data: { item },
+   });
+
+   // ❌ wrong
+   res.status(201).json({ success: true, message: "Item created successfully", data: { item } });
+   ```
+
 ```typescript
 import type { Request, Response, NextFunction } from "express";
 import { errorHandler } from "../middleware/errorHandler";
@@ -119,7 +161,10 @@ export const getItemById = async (req: Request, res: Response, next: NextFunctio
     }
 
     // Return item
-    res.status(200).json({ success: true, data: { item } });
+    res.status(200).json({
+      success: true,
+      data: { item },
+    });
   } catch (error: any) {
     next(error);
   }
@@ -142,7 +187,11 @@ export const createItem = async (req: Request, res: Response, next: NextFunction
     const item = await Item.create({ name });
 
     // Return created item
-    res.status(201).json({ success: true, message: "Item created successfully", data: { item } });
+    res.status(201).json({
+      success: true,
+      message: "Item created successfully",
+      data: { item },
+    });
   } catch (error: any) {
     next(error);
   }
@@ -310,6 +359,12 @@ Two-part pattern — all controllers must use both pieces:
 ---
 
 ## API Documentation
+
+### Source of Truth
+
+For a complete understanding of any module — its purpose, data model, business rules, and API contract — refer to [`doc/BACKEND_DOCUMENTATION.md`](doc/BACKEND_DOCUMENTATION.md). That file is the authoritative reference for the project.
+
+### Module Documentation
 
 Every module has its own documentation file at `doc/modules/<MODULE>_DOCUMENTATION.md`. The structure and content of every module doc must match this template exactly — replace "Item/item/items" with the actual module entity name. When a controller, route, or model field changes, the corresponding section in the module doc must be updated in the same commit.
 
@@ -1120,7 +1175,101 @@ src/
 
 ## Environment Variables
 
-Key required variables: `MONGO_URI`, `PORT`, `NODE_ENV`, `JWT_SECRET`. See `.env` for the full list (payments, SMS, storage, OAuth). The `CALLBACK_URL` env var dynamically adds an extra allowed CORS origin at startup.
+The `CALLBACK_URL` env var dynamically adds an extra allowed CORS origin at startup.
+
+```env
+# ===== App/Runtime =====
+NODE_ENV=
+PORT=
+APP_NAME=
+TIMEZONE=
+LOG_LEVEL=
+
+# ===== URLs/CORS =====
+API_BASE_URL=
+FRONTEND_URL=
+ADMIN_URL=
+CORS_ORIGIN=
+
+# ===== Database =====
+MONGO_URI=
+
+# ===== Auth & Security =====
+JWT_SECRET=
+JWT_EXPIRES_IN=
+REFRESH_TOKEN_SECRET=
+COOKIE_SECRET=
+OTP_EXP_MINUTES=
+RATE_LIMIT_WINDOW_MS=
+RATE_LIMIT_MAX=
+
+# ===== OAuth/Social =====
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_PLACE_API=
+APPLE_CLIENT_ID=
+APPLE_TEAM_ID=
+APPLE_KEY_ID=
+APPLE_PRIVATE_KEY=
+INSTAGRAM_CLIENT_ID=
+INSTAGRAM_CLIENT_SECRET=
+INSTAGRAM_REDIRECT_URI=
+
+# ===== Email (SMTP) =====
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
+
+# ===== SMS =====
+SMS_PROVIDER=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
+AT_API_KEY=
+AT_USERNAME=
+
+# ===== Payments =====
+PAYSTACK_PUBLIC_KEY=
+PAYSTACK_SECRET_KEY=
+MPESA_CONSUMER_KEY=
+MPESA_CONSUMER_SECRET=
+MPESA_SHORT_CODE=
+MPESA_PASSKEY=
+MPESA_ENV=
+CALLBACK_URL=
+
+# ===== Storage/CDN =====
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+
+# ===== External Services =====
+REDIS_URL=
+
+# ===== Notifications/Monitoring =====
+SENTRY_DSN=
+GA_MEASUREMENT_ID=
+MIXPANEL_TOKEN=
+
+# ===== Location/Maps =====
+LOCATIONIQ_TOKEN=
+
+# ===== Currency & Business Config =====
+DEFAULT_CURRENCY=
+ENABLE_SCHEDULING=
+SCHEDULING_FEE=
+DELIVERY_FEE_PER_KM=
+ALLOW_PREORDERS=
+MAX_UPLOAD_SIZE=
+
+# ===== Firebase =====
+FIREBASE_PROJECT_ID=
+FIREBASE_PRIVATE_KEY=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_DATABASE_URL=
+```
 
 ---
 

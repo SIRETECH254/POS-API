@@ -1225,45 +1225,97 @@ draft → open → (items added) → awaiting_payment
 ## 🔐 Environment Variables
 
 ```env
-# Server
-NODE_ENV=development
-PORT=4000
-CORS_ORIGIN=http://localhost:3000
+# ===== App/Runtime =====
+NODE_ENV=
+PORT=
+APP_NAME=
+TIMEZONE=
+LOG_LEVEL=
 
-# Database
-MONGO_URI=mongodb://localhost:27017/club-pos
+# ===== URLs/CORS =====
+API_BASE_URL=
+FRONTEND_URL=
+ADMIN_URL=
+CORS_ORIGIN=
 
-# JWT
-JWT_SECRET=your_jwt_secret
-JWT_EXPIRES_IN=8h
-JWT_REFRESH_SECRET=your_refresh_secret
+# ===== Database =====
+MONGO_URI=
 
-# M-Pesa (Daraja API)
-MPESA_ENV=sandbox
-MPESA_CONSUMER_KEY=your_consumer_key
-MPESA_CONSUMER_SECRET=your_consumer_secret
-MPESA_SHORT_CODE=your_shortcode
-MPESA_PASSKEY=your_passkey
-MPESA_CALLBACK_URL=https://yourdomain.com/api/payments/mpesa/callback
+# ===== Auth & Security =====
+JWT_SECRET=
+JWT_EXPIRES_IN=
+REFRESH_TOKEN_SECRET=
+COOKIE_SECRET=
+OTP_EXP_MINUTES=
+RATE_LIMIT_WINDOW_MS=
+RATE_LIMIT_MAX=
 
-# SMS (Africa's Talking)
-AFRICAS_TALKING_API_KEY=your_api_key
-AFRICAS_TALKING_USERNAME=your_username
+# ===== OAuth/Social =====
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_PLACE_API=
+APPLE_CLIENT_ID=
+APPLE_TEAM_ID=
+APPLE_KEY_ID=
+APPLE_PRIVATE_KEY=
+INSTAGRAM_CLIENT_ID=
+INSTAGRAM_CLIENT_SECRET=
+INSTAGRAM_REDIRECT_URI=
 
-# Email
-SMTP_HOST=smtp.gmail.com
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_password
-FROM_EMAIL=noreply@clubpos.com
+# ===== Email (SMTP) =====
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
 
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+# ===== SMS =====
+SMS_PROVIDER=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
+AT_API_KEY=
+AT_USERNAME=
 
-# Printer
-PRINTER_TYPE=usb
-PRINTER_TARGET=/dev/usb/lp0
+# ===== Payments =====
+PAYSTACK_PUBLIC_KEY=
+PAYSTACK_SECRET_KEY=
+MPESA_CONSUMER_KEY=
+MPESA_CONSUMER_SECRET=
+MPESA_SHORT_CODE=
+MPESA_PASSKEY=
+MPESA_ENV=
+CALLBACK_URL=
+
+# ===== Storage/CDN =====
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+
+# ===== External Services =====
+REDIS_URL=
+
+# ===== Notifications/Monitoring =====
+SENTRY_DSN=
+GA_MEASUREMENT_ID=
+MIXPANEL_TOKEN=
+
+# ===== Location/Maps =====
+LOCATIONIQ_TOKEN=
+
+# ===== Currency & Business Config =====
+DEFAULT_CURRENCY=
+ENABLE_SCHEDULING=
+SCHEDULING_FEE=
+DELIVERY_FEE_PER_KM=
+ALLOW_PREORDERS=
+MAX_UPLOAD_SIZE=
+
+# ===== Firebase =====
+FIREBASE_PROJECT_ID=
+FIREBASE_PRIVATE_KEY=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_DATABASE_URL=
 ```
 
 ---

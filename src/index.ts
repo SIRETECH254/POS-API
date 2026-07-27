@@ -6,6 +6,7 @@ import path from "path";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import swaggerConfig from "./config/swagger";
+import roleRoutes from "./routes/roleRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -20,7 +21,7 @@ const allowedOrigins: string[] = [
   "http://localhost:5174",
   "http://localhost:5175",
   "http://localhost:3500",
-  "https://pos-api.onrender.com"
+  "https://pos-api-9cb5.onrender.com"
 ];
 
 if (process.env.CALLBACK_URL) {
@@ -92,7 +93,7 @@ app.use(
 );
 
 // Route registrations
-// Example: app.use("/api/auth", authRoutes);
+app.use("/api/roles", roleRoutes);
 
 // Main API endpoint
 app.get("/api", (_req, res) => {
