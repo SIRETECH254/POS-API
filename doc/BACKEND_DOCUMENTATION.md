@@ -588,6 +588,67 @@ interface ISettings {
 
 ---
 
+### 21. Location Model
+```typescript
+interface ILocation {
+  _id: ObjectId;
+  placeId?: string;         // Google Places ID, optional (for dedup in future iterations)
+  name: string;             // place name, e.g. "Nairobi"
+  formattedAddress: string; // full formatted address from Google Places
+  coordinates: { lat: number; lng: number };
+  regions: {
+    country: string;
+    locality?: string;
+    sublocality?: string;
+    sublocality_level_1?: string;
+    administrative_area_level_1?: string;
+    plus_code?: string;
+    political?: string;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Notes:** Stores geographic data returned by Google Maps Text Search. Referenced by Address documents. The `GOOGLE_PLACE_API` env var is used (not `GOOGLE_PLACES_API_KEY`). See `doc/modules/LOCATION_DOCUMENTATION.md`.
+
+---
+
+### 22. Address Model
+```typescript
+interface IAddress {
+  _id: ObjectId;
+  userId: ObjectId;         // ref: User — owner of this address
+  name: string;             // label, e.g. "Home", "Office"
+  location: ObjectId;       // ref: Location — holds all geographic data
+  details?: string;         // optional notes, e.g. "Near gate B"
+  isDefault: boolean;       // only one default per user (enforced via pre-save hook)
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Notes:** Users can maintain multiple saved addresses. The `location` field is an ObjectId reference to the Location model — all coordinates and region data live on the Location document. The pre-save hook automatically unsets `isDefault` on all other addresses for the same user when a new default is set. See `doc/modules/ADDRESS_DOCUMENTATION.md`.
+
+---
+
+### 23. Branch Model *(implemented)*
+```typescript
+interface IBranch {
+  _id: ObjectId;
+  name: string;             // unique
+  code?: string;            // short identifier, e.g. "MAIN", "WBR"
+  phone?: string;
+  email?: string;
+  address?: ObjectId;       // ref: Address — branch physical address
+  isMain: boolean;          // headquarters; cannot be deleted
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Notes:** The `address` field is an ObjectId ref to an Address document (which in turn references a Location). Run `npm run seed:branch` to create the "Main Branch" record. The main branch is protected from deletion at the controller level. See `doc/modules/BRANCH_DOCUMENTATION.md`.
+
+---
+
 ## 🎮 Controllers
 
 ### 1. Auth Controller — `authController.ts`
@@ -765,6 +826,26 @@ interface ISettings {
 - `updateSettings(branchId)`
 - `updatePrinterConfig()`
 - `updateReceiptLayout()`
+
+### 22. Location Controller — `locationController.ts` *(implemented)*
+- `searchLocation()` — proxy Google Maps Text Search (public)
+- `saveLocation()` — persist a selected place to the database (authenticated)
+- `getLocationById()` — fetch a saved location by ID (authenticated)
+
+### 23. Address Controller — `addressController.ts` *(implemented)*
+- `getUserAddresses()` — list authenticated user's addresses with pagination
+- `getAddressById()` — fetch a single address (scoped to owner)
+- `createAddress()` — create address linked to a Location document via `locationId`
+- `updateAddress()` — partial update; accepts new `locationId`
+- `deleteAddress()` — delete address (scoped to owner)
+- `setDefaultAddress()` — mark address as default; pre-save hook unsets previous default
+
+### 24. Branch Controller — `branchController.ts` *(implemented)*
+- `getAllBranches()` — paginated, filterable list; main branch sorted first
+- `getBranchById()` — fetch branch with populated address and location
+- `createBranch()` — admin only; unique name guard; accepts `addressId`
+- `updateBranch()` — admin only; unique name guard on change; verifies `addressId` if provided
+- `deleteBranch()` — admin only; blocked when `isMain: true`
 
 ---
 
@@ -1004,6 +1085,35 @@ GET    /entity/:entityType/:entityId
 ```
 GET    /:branchId
 PUT    /:branchId                      // admin/manager
+```
+
+### Location Routes *(implemented)*
+**Base:** `/api/locations`
+```
+GET    /search                         // public — Google Maps proxy
+POST   /                               // authenticated — save a location
+GET    /:locationId                    // authenticated — fetch saved location
+```
+
+### Address Routes *(implemented)*
+**Base:** `/api/addresses`
+```
+GET    /                               // authenticated — user's addresses (paginated)
+GET    /:addressId                     // authenticated — address by ID
+POST   /                               // authenticated — create (body: name, locationId)
+PUT    /:addressId                     // authenticated — update
+DELETE /:addressId                     // authenticated — delete
+PATCH  /:addressId/default             // authenticated — set as default
+```
+
+### Branch Routes *(implemented)*
+**Base:** `/api/branches`
+```
+GET    /                               // admin/manager — all branches (paginated)
+GET    /:branchId                      // admin/manager — branch by ID
+POST   /                               // admin — create (body: name, addressId?)
+PUT    /:branchId                      // admin — update
+DELETE /:branchId                      // admin — delete (blocked if isMain)
 ```
 
 ### Utility Routes

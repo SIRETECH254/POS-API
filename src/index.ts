@@ -7,6 +7,9 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import swaggerConfig from "./config/swagger";
 import roleRoutes from "./routes/roleRoutes";
+import locationRoutes from "./routes/locationRoutes";
+import addressRoutes from "./routes/addressRoutes";
+import branchRoutes from "./routes/branchRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -94,6 +97,14 @@ app.use(
 
 // Route registrations
 app.use("/api/roles", roleRoutes);
+
+app.use("/api/locations", locationRoutes);
+
+app.use("/api/addresses", addressRoutes);
+
+app.use("/api/branches", branchRoutes);
+
+
 
 // Main API endpoint
 app.get("/api", (_req, res) => {
