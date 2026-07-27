@@ -6,6 +6,7 @@ import path from "path";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import swaggerConfig from "./config/swagger";
+import authRoutes from "./routes/authRoutes";
 import roleRoutes from "./routes/roleRoutes";
 import locationRoutes from "./routes/locationRoutes";
 import addressRoutes from "./routes/addressRoutes";
@@ -96,6 +97,8 @@ app.use(
 );
 
 // Route registrations
+app.use("/api/auth", authRoutes);
+
 app.use("/api/roles", roleRoutes);
 
 app.use("/api/locations", locationRoutes);

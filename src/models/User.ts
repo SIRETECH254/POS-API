@@ -1,18 +1,14 @@
 import mongoose, { Schema } from "mongoose";
-import { IUser, UserRole } from "../type";
-
-const ROLE_VALUES: UserRole[] = [
-  "bartender",
-  "cashier",
-  "store_keeper",
-  "manager",
-  "admin",
-  "accountant",
-];
+import { IUser } from "../type";
 
 const userSchema = new Schema<IUser>(
   {
-    name: {
+    firstName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    lastName: {
       type: String,
       required: true,
       trim: true,
@@ -24,21 +20,31 @@ const userSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
     },
+    phone: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
     password: {
       type: String,
       required: true,
+      select: false,
     },
-    roles: {
-      type: [String],
-      enum: ROLE_VALUES,
-      default: ["bartender"],
+    pin: {
+      type: String,
+      select: false,
+    },
+    role: {
+      type: Schema.Types.ObjectId,
+      ref: "Role",
+      required: true,
     },
     branch: {
       type: Schema.Types.ObjectId,
       ref: "Branch",
-      required: true,
     },
-    isActive: {
+    status: {
       type: Boolean,
       default: true,
     },
@@ -48,13 +54,29 @@ const userSchema = new Schema<IUser>(
     avatarPublicId: {
       type: String,
     },
+    lastLoginAt: {
+      type: Date,
+    },
+    currentShift: {
+      type: Schema.Types.ObjectId,
+      ref: "Shift",
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpiry: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
 
 userSchema.index({ email: 1 });
-userSchema.index({ roles: 1 });
-userSchema.index({ isActive: 1 });
+userSchema.index({ phone: 1 });
+userSchema.index({ status: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ branch: 1 });
 
 const User = mongoose.model<IUser>("User", userSchema);
 export default User;

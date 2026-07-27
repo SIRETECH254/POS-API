@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 import User from "../models/User";
-import { IUser, UserRole } from "../type";
+import { IRole, IUser, UserRole } from "../type";
 
 declare global {
   namespace Express {
@@ -12,7 +12,7 @@ declare global {
 }
 
 /**
- * Verify JWT token and load the user onto req.user
+ * Verify JWT token and load the user (with populated role) onto req.user
  */
 export const authenticateToken = async (
   req: Request,
@@ -29,9 +29,9 @@ export const authenticateToken = async (
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId).populate("role");
 
-    if (!user || !user.isActive) {
+    if (!user || !user.status) {
       res.status(401).json({ success: false, message: "User unauthorized or inactive" });
       return;
     }
@@ -53,9 +53,9 @@ export const authorizeRoles = (allowedRoles: UserRole[]) => {
       return;
     }
 
-    const hasRole = req.user.roles.some((role) => allowedRoles.includes(role));
+    const roleName = (req.user.role as IRole).name;
 
-    if (!hasRole) {
+    if (!allowedRoles.includes(roleName)) {
       res.status(403).json({ success: false, message: "Insufficient permissions for this action" });
       return;
     }

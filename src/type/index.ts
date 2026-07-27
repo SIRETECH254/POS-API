@@ -17,14 +17,21 @@ export interface IRole extends Document {
 }
 
 export interface IUser extends Document {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
+  phone: string;
   password: string;
-  roles: UserRole[];
-  branch: Types.ObjectId;
-  isActive: boolean;
+  pin?: string;
+  role: Types.ObjectId | IRole;
+  branch?: Types.ObjectId | IBranch;
+  status: boolean;
   avatar?: string;
   avatarPublicId?: string;
+  lastLoginAt?: Date;
+  currentShift?: Types.ObjectId;
+  resetPasswordToken?: string;
+  resetPasswordExpiry?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
