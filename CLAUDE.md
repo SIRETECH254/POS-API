@@ -15,6 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - [Real-time (Socket.io)](#real-time-socketio)
 - [API Documentation](#api-documentation)
 - [Swagger](#swagger)
+- [Cloudinary](#cloudinary)
 - [Project Layout](#project-layout)
 - [Environment Variables](#environment-variables)
 - [Commands](#commands)
@@ -1046,6 +1047,58 @@ The `bearerAuth` scheme is pre-configured in `src/config/swagger.ts`. Swagger au
  */
 router.post("/", authenticateToken, authorizeRoles(["admin"]), createItem);
 ```
+
+---
+
+## Cloudinary
+
+Any module that involves images, files, or attachments must go through Cloudinary — files are never stored locally. The configuration and all helper exports live in `src/config/cloudinary.ts`.
+
+### Multer Middleware (apply at route level)
+
+| Export | Folder | Limit | Types |
+|---|---|---|---|
+| `uploadUserAvatar` | `pos-api/avatars` | 2 MB | Images |
+| `uploadProductImage` | `pos-api/products` | 2 MB | Images |
+| `uploadExpenseReceipt` | `pos-api/expense-receipts` | 5 MB | Images + PDF |
+
+```typescript
+// Route level — middleware goes before the controller
+router.post("/:productId/image", authenticateToken, uploadProductImage.single("image"), uploadProductImageController);
+```
+
+### Helper Functions
+
+```typescript
+// Upload — returns { url, public_id, format, size }
+const result = await uploadToCloudinary(req.file, "pos-api/products");
+
+// Delete — always call before replacing an existing asset
+await deleteFromCloudinary(entity.imagePublicId);
+```
+
+### Controller Pattern
+
+Every model with a Cloudinary asset stores both `url` and `public_id`. Always delete the old asset before uploading a new one:
+
+```typescript
+if (req.file) {
+  const uploadResult = await uploadToCloudinary(req.file, "pos-api/products");
+
+  if (entity.imagePublicId) {
+    try {
+      await deleteFromCloudinary(entity.imagePublicId);
+    } catch (deleteError) {
+      console.error("Failed to delete previous asset:", deleteError);
+    }
+  }
+
+  entity.image = uploadResult.url;
+  entity.imagePublicId = uploadResult.public_id;
+}
+```
+
+Deletion errors are caught locally and logged — they must not abort the main controller flow.
 
 ---
 
