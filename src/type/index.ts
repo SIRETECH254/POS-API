@@ -81,6 +81,14 @@ export interface IBranch extends Document {
   updatedAt: Date;
 }
 
+export interface ICategory extends Document {
+  name: string;
+  description: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export type ShiftStatus = "open" | "closed";
 
 export interface IShift extends Document {
