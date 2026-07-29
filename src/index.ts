@@ -11,6 +11,7 @@ import roleRoutes from "./routes/roleRoutes";
 import locationRoutes from "./routes/locationRoutes";
 import addressRoutes from "./routes/addressRoutes";
 import branchRoutes from "./routes/branchRoutes";
+import userRoutes from "./routes/userRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -106,6 +107,8 @@ app.use("/api/locations", locationRoutes);
 app.use("/api/addresses", addressRoutes);
 
 app.use("/api/branches", branchRoutes);
+
+app.use("/api/users", userRoutes);
 
 
 

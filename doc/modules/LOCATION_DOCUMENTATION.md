@@ -296,8 +296,99 @@ import { authenticateToken } from "../middleware/auth";
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /api/locations/search:
+ *   get:
+ *     summary: Search locations via Google Maps Text Search
+ *     tags: [Locations]
+ *     parameters:
+ *       - in: query
+ *         name: query
+ *         required: true
+ *         schema: { type: string }
+ *         description: Text query to search for places
+ *     responses:
+ *       200:
+ *         description: Location results retrieved successfully
+ *       400:
+ *         description: Query parameter is required or invalid
+ *       500:
+ *         description: Failed to fetch location data
+ */
 router.get("/search", searchLocation);
+
+/**
+ * @swagger
+ * /api/locations:
+ *   post:
+ *     summary: Save a selected location to the database
+ *     tags: [Locations]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, formattedAddress, coordinates, regions]
+ *             properties:
+ *               placeId:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               formattedAddress:
+ *                 type: string
+ *               coordinates:
+ *                 type: object
+ *                 required: [lat, lng]
+ *                 properties:
+ *                   lat: { type: number }
+ *                   lng: { type: number }
+ *               regions:
+ *                 type: object
+ *                 required: [country]
+ *                 properties:
+ *                   country: { type: string }
+ *                   locality: { type: string }
+ *                   sublocality: { type: string }
+ *                   sublocality_level_1: { type: string }
+ *                   administrative_area_level_1: { type: string }
+ *                   plus_code: { type: string }
+ *                   political: { type: string }
+ *     responses:
+ *       201:
+ *         description: Location saved successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
 router.post("/", authenticateToken, saveLocation);
+
+/**
+ * @swagger
+ * /api/locations/{locationId}:
+ *   get:
+ *     summary: Get a saved location by ID
+ *     tags: [Locations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: locationId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Location document ID
+ *     responses:
+ *       200:
+ *         description: Location retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Location not found
+ */
 router.get("/:locationId", authenticateToken, getLocationById);
 
 export default router;
@@ -317,7 +408,10 @@ export default router;
         "name": "Nairobi",
         "formatted_address": "Nairobi, Kenya",
         "geometry": {
-          "location": { "lat": -1.2920659, "lng": 36.8219462 }
+          "location": {
+            "lat": -1.2920659,
+            "lng": 36.8219462
+          }
         },
         "place_id": "ChIJ77p_JpE_LxARtIuN-k9sR5I",
         "types": ["locality", "political"]
@@ -335,7 +429,10 @@ export default router;
   "placeId": "ChIJ77p_JpE_LxARtIuN-k9sR5I",
   "name": "Nairobi",
   "formattedAddress": "Nairobi, Kenya",
-  "coordinates": { "lat": -1.2920659, "lng": 36.8219462 },
+  "coordinates": {
+    "lat": -1.2920659,
+    "lng": 36.8219462
+  },
   "regions": {
     "country": "Kenya",
     "locality": "Nairobi",
@@ -350,12 +447,18 @@ export default router;
   "message": "Location saved successfully",
   "data": {
     "location": {
-      "_id": "6638b2c3d4e5f6g7h8i9j0k1",
+      "_id": "6638b2c3d4e5f6a7b8c9d0e1",
       "placeId": "ChIJ77p_JpE_LxARtIuN-k9sR5I",
       "name": "Nairobi",
       "formattedAddress": "Nairobi, Kenya",
-      "coordinates": { "lat": -1.2920659, "lng": 36.8219462 },
-      "regions": { "country": "Kenya", "locality": "Nairobi" },
+      "coordinates": {
+        "lat": -1.2920659,
+        "lng": 36.8219462
+      },
+      "regions": {
+        "country": "Kenya",
+        "locality": "Nairobi"
+      },
       "createdAt": "2026-07-27T10:00:00.000Z",
       "updatedAt": "2026-07-27T10:00:00.000Z"
     }
@@ -371,11 +474,16 @@ export default router;
   "success": true,
   "data": {
     "location": {
-      "_id": "6638b2c3d4e5f6g7h8i9j0k1",
+      "_id": "6638b2c3d4e5f6a7b8c9d0e1",
       "name": "Nairobi",
       "formattedAddress": "Nairobi, Kenya",
-      "coordinates": { "lat": -1.2920659, "lng": 36.8219462 },
-      "regions": { "country": "Kenya" }
+      "coordinates": {
+        "lat": -1.2920659,
+        "lng": 36.8219462
+      },
+      "regions": {
+        "country": "Kenya"
+      }
     }
   }
 }
@@ -400,12 +508,34 @@ export default router;
 ```bash
 curl -X GET "http://localhost:3500/api/locations/search?query=Nairobi"
 ```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "name": "Nairobi",
+        "formatted_address": "Nairobi, Kenya",
+        "geometry": {
+          "location": {
+            "lat": -1.2920659,
+            "lng": 36.8219462
+          }
+        },
+        "place_id": "ChIJ77p_JpE_LxARtIuN-k9sR5I",
+        "types": ["locality", "political"]
+      }
+    ]
+  }
+}
+```
 
 ### Save Location
 ```bash
 curl -X POST http://localhost:3500/api/locations \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "placeId": "ChIJ77p_JpE_LxARtIuN-k9sR5I",
     "name": "Nairobi",
@@ -414,11 +544,60 @@ curl -X POST http://localhost:3500/api/locations \
     "regions": { "country": "Kenya", "locality": "Nairobi" }
   }'
 ```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Location saved successfully",
+  "data": {
+    "location": {
+      "_id": "6638b2c3d4e5f6a7b8c9d0e1",
+      "placeId": "ChIJ77p_JpE_LxARtIuN-k9sR5I",
+      "name": "Nairobi",
+      "formattedAddress": "Nairobi, Kenya",
+      "coordinates": {
+        "lat": -1.2920659,
+        "lng": 36.8219462
+      },
+      "regions": {
+        "country": "Kenya",
+        "locality": "Nairobi"
+      },
+      "createdAt": "2026-07-27T10:00:00.000Z",
+      "updatedAt": "2026-07-27T10:00:00.000Z"
+    }
+  }
+}
+```
 
 ### Get Location by ID
 ```bash
-curl -X GET http://localhost:3500/api/locations/6638b2c3d4e5f6g7h8i9j0k1 \
-  -H "Authorization: Bearer <token>"
+curl -X GET http://localhost:3500/api/locations/6638b2c3d4e5f6a7b8c9d0e1 \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "location": {
+      "_id": "6638b2c3d4e5f6a7b8c9d0e1",
+      "placeId": "ChIJ77p_JpE_LxARtIuN-k9sR5I",
+      "name": "Nairobi",
+      "formattedAddress": "Nairobi, Kenya",
+      "coordinates": {
+        "lat": -1.2920659,
+        "lng": 36.8219462
+      },
+      "regions": {
+        "country": "Kenya",
+        "locality": "Nairobi"
+      },
+      "createdAt": "2026-07-27T10:00:00.000Z",
+      "updatedAt": "2026-07-27T10:00:00.000Z"
+    }
+  }
+}
 ```
 
 ---
@@ -435,17 +614,18 @@ curl -X GET http://localhost:3500/api/locations/6638b2c3d4e5f6g7h8i9j0k1 \
 
 Common responses:
 ```json
-{ "success": false, "message": "Query parameter is required" }
-{ "success": false, "message": "Query parameter must be a string" }
-{ "success": false, "message": "Name is required" }
-{ "success": false, "message": "Formatted address is required" }
-{ "success": false, "message": "Coordinates are required" }
-{ "success": false, "message": "Coordinates lat is required" }
-{ "success": false, "message": "Coordinates lng is required" }
-{ "success": false, "message": "Regions are required" }
-{ "success": false, "message": "Regions country is required" }
-{ "success": false, "message": "Location not found" }
+{
+  "success": false,
+  "message": "..."
+}
 ```
+
+| Status | Scenario |
+|--------|----------|
+| 400 | Query parameter is required or not a string; name, formattedAddress, coordinates, or regions fields missing |
+| 401 | Missing or invalid JWT |
+| 404 | Location not found |
+| 500 | Google Maps API failure or internal server error |
 
 ---
 

@@ -415,11 +415,179 @@ import { authenticateToken } from "../middleware/auth";
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /api/addresses:
+ *   get:
+ *     summary: Get all addresses for the authenticated user
+ *     tags: [Addresses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer }
+ *         description: Page number (default 1)
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer }
+ *         description: Results per page (default 10)
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Search by address name
+ *     responses:
+ *       200:
+ *         description: Addresses retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
 router.get("/", authenticateToken, getUserAddresses);
+
+/**
+ * @swagger
+ * /api/addresses/{addressId}:
+ *   get:
+ *     summary: Get a single address by ID
+ *     tags: [Addresses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: addressId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Address document ID
+ *     responses:
+ *       200:
+ *         description: Address retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Address not found
+ */
 router.get("/:addressId", authenticateToken, getAddressById);
+
+/**
+ * @swagger
+ * /api/addresses:
+ *   post:
+ *     summary: Create a new address for the authenticated user
+ *     tags: [Addresses]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, locationId]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Label for the address (e.g. Home, Office)
+ *               locationId:
+ *                 type: string
+ *                 description: ID of a saved Location document
+ *               details:
+ *                 type: string
+ *                 description: Optional notes (e.g. Near gate B)
+ *               isDefault:
+ *                 type: boolean
+ *     responses:
+ *       201:
+ *         description: Address created successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Location not found
+ */
 router.post("/", authenticateToken, createAddress);
+
+/**
+ * @swagger
+ * /api/addresses/{addressId}:
+ *   put:
+ *     summary: Update an address
+ *     tags: [Addresses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: addressId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               locationId:
+ *                 type: string
+ *               details:
+ *                 type: string
+ *               isDefault:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Address updated successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Address not found
+ */
 router.put("/:addressId", authenticateToken, updateAddress);
+
+/**
+ * @swagger
+ * /api/addresses/{addressId}:
+ *   delete:
+ *     summary: Delete an address
+ *     tags: [Addresses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: addressId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Address deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Address not found
+ */
 router.delete("/:addressId", authenticateToken, deleteAddress);
+
+/**
+ * @swagger
+ * /api/addresses/{addressId}/default:
+ *   patch:
+ *     summary: Set an address as the default
+ *     tags: [Addresses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: addressId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Default address updated successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Address not found
+ */
 router.patch("/:addressId/default", authenticateToken, setDefaultAddress);
 
 export default router;
@@ -444,8 +612,13 @@ export default router;
           "_id": "7749c3d4e5f6g7h8i9j0k1l2",
           "name": "Nairobi",
           "formattedAddress": "Nairobi, Kenya",
-          "coordinates": { "lat": -1.2920659, "lng": 36.8219462 },
-          "regions": { "country": "Kenya" }
+          "coordinates": {
+            "lat": -1.2920659,
+            "lng": 36.8219462
+          },
+          "regions": {
+            "country": "Kenya"
+          }
         },
         "details": "Near gate B",
         "isDefault": true,
@@ -479,8 +652,13 @@ export default router;
         "_id": "7749c3d4e5f6g7h8i9j0k1l2",
         "name": "Nairobi",
         "formattedAddress": "Nairobi, Kenya",
-        "coordinates": { "lat": -1.2920659, "lng": 36.8219462 },
-        "regions": { "country": "Kenya" }
+        "coordinates": {
+          "lat": -1.2920659,
+          "lng": 36.8219462
+        },
+        "regions": {
+          "country": "Kenya"
+        }
       },
       "details": "Near gate B",
       "isDefault": true
@@ -578,9 +756,13 @@ export default router;
 
 ## 🔐 Middleware
 
-#### `authenticateToken`
-**Purpose:** Verify JWT token and load user  
-**Usage:** Applied to all address routes. Ownership is enforced by scoping queries to `userId: req.user?._id`.
+### `authenticateToken`
+**Purpose:** Verify JWT token and load user. Returns 401 if token is missing or invalid.
+**Usage:**
+```typescript
+router.get("/", authenticateToken, getUserAddresses);
+```
+All address routes are scoped to the authenticated user via `userId: req.user?._id` — no user can access another user's addresses.
 
 ---
 
@@ -589,20 +771,87 @@ export default router;
 ### Get User Addresses
 ```bash
 curl -X GET "http://localhost:3500/api/addresses?page=1&limit=10&search=Home" \
-  -H "Authorization: Bearer <token>"
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "addresses": [
+      {
+        "_id": "6638b2c3d4e5f6g7h8i9j0k1",
+        "userId": "65e26b1c09b068c201383801",
+        "name": "Home",
+        "location": {
+          "_id": "7749c3d4e5f6g7h8i9j0k1l2",
+          "name": "Nairobi",
+          "formattedAddress": "Nairobi, Kenya",
+          "coordinates": {
+            "lat": -1.2920659,
+            "lng": 36.8219462
+          },
+          "regions": {
+            "country": "Kenya"
+          }
+        },
+        "details": "Near gate B",
+        "isDefault": true,
+        "createdAt": "2026-07-27T10:00:00.000Z",
+        "updatedAt": "2026-07-27T10:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 1,
+      "totalAddresses": 1,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    }
+  }
+}
 ```
 
 ### Get Address by ID
 ```bash
 curl -X GET http://localhost:3500/api/addresses/6638b2c3d4e5f6g7h8i9j0k1 \
-  -H "Authorization: Bearer <token>"
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "address": {
+      "_id": "6638b2c3d4e5f6g7h8i9j0k1",
+      "userId": "65e26b1c09b068c201383801",
+      "name": "Home",
+      "location": {
+        "_id": "7749c3d4e5f6g7h8i9j0k1l2",
+        "name": "Nairobi",
+        "formattedAddress": "Nairobi, Kenya",
+        "coordinates": {
+          "lat": -1.2920659,
+          "lng": 36.8219462
+        },
+        "regions": {
+          "country": "Kenya"
+        }
+      },
+      "details": "Near gate B",
+      "isDefault": true,
+      "createdAt": "2026-07-27T10:00:00.000Z",
+      "updatedAt": "2026-07-27T10:00:00.000Z"
+    }
+  }
+}
 ```
 
 ### Create Address
 ```bash
 curl -X POST http://localhost:3500/api/addresses \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "name": "Home",
     "locationId": "7749c3d4e5f6g7h8i9j0k1l2",
@@ -610,28 +859,104 @@ curl -X POST http://localhost:3500/api/addresses \
     "isDefault": true
   }'
 ```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Address created successfully",
+  "data": {
+    "address": {
+      "_id": "6638b2c3d4e5f6g7h8i9j0k1",
+      "userId": "65e26b1c09b068c201383801",
+      "name": "Home",
+      "location": {
+        "_id": "7749c3d4e5f6g7h8i9j0k1l2",
+        "name": "Nairobi",
+        "formattedAddress": "Nairobi, Kenya"
+      },
+      "details": "Near gate B",
+      "isDefault": true,
+      "createdAt": "2026-07-27T10:00:00.000Z",
+      "updatedAt": "2026-07-27T10:00:00.000Z"
+    }
+  }
+}
+```
 
 ### Update Address
 ```bash
 curl -X PUT http://localhost:3500/api/addresses/6638b2c3d4e5f6g7h8i9j0k1 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "name": "Office",
     "details": "3rd floor, Room 301"
   }'
 ```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Address updated successfully",
+  "data": {
+    "address": {
+      "_id": "6638b2c3d4e5f6g7h8i9j0k1",
+      "userId": "65e26b1c09b068c201383801",
+      "name": "Office",
+      "location": {
+        "_id": "7749c3d4e5f6g7h8i9j0k1l2",
+        "name": "Nairobi",
+        "formattedAddress": "Nairobi, Kenya"
+      },
+      "details": "3rd floor, Room 301",
+      "isDefault": false,
+      "createdAt": "2026-07-27T10:00:00.000Z",
+      "updatedAt": "2026-07-27T10:30:00.000Z"
+    }
+  }
+}
+```
 
 ### Delete Address
 ```bash
 curl -X DELETE http://localhost:3500/api/addresses/6638b2c3d4e5f6g7h8i9j0k1 \
-  -H "Authorization: Bearer <token>"
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Address deleted successfully"
+}
 ```
 
 ### Set Default Address
 ```bash
 curl -X PATCH http://localhost:3500/api/addresses/6638b2c3d4e5f6g7h8i9j0k1/default \
-  -H "Authorization: Bearer <token>"
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Default address updated successfully",
+  "data": {
+    "address": {
+      "_id": "6638b2c3d4e5f6g7h8i9j0k1",
+      "userId": "65e26b1c09b068c201383801",
+      "name": "Office",
+      "location": {
+        "_id": "7749c3d4e5f6g7h8i9j0k1l2",
+        "name": "Nairobi",
+        "formattedAddress": "Nairobi, Kenya"
+      },
+      "details": "3rd floor, Room 301",
+      "isDefault": true,
+      "createdAt": "2026-07-27T10:00:00.000Z",
+      "updatedAt": "2026-07-27T10:30:00.000Z"
+    }
+  }
+}
 ```
 
 ---
@@ -648,15 +973,18 @@ curl -X PATCH http://localhost:3500/api/addresses/6638b2c3d4e5f6g7h8i9j0k1/defau
 
 Common responses:
 ```json
-{ "success": false, "message": "Name is required" }
-{ "success": false, "message": "Location ID is required" }
-{ "success": false, "message": "Location not found" }
-{ "success": false, "message": "Address not found" }
+{
+  "success": false,
+  "message": "..."
+}
 ```
 
-- `400 Bad Request`: Missing required fields.
-- `404 Not Found`: Address or Location not found for current user.
-- `500 Internal Server Error`: Unexpected server-side error.
+| Status | Scenario |
+|--------|----------|
+| 400 | Missing name or locationId |
+| 401 | Missing or invalid JWT |
+| 404 | Address not found (or does not belong to user); Location not found |
+| 500 | Internal server error |
 
 ---
 

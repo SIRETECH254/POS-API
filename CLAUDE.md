@@ -368,6 +368,39 @@ For a complete understanding of any module — its purpose, data model, business
 
 Every module has its own documentation file at `doc/modules/<MODULE>_DOCUMENTATION.md`. The structure and content of every module doc must match this template exactly — replace "Item/item/items" with the actual module entity name. When a controller, route, or model field changes, the corresponding section in the module doc must be updated in the same commit.
 
+**Documentation JSON style rules:**
+
+1. All JSON blocks must be fully vertical — never compressed to a single line. Every key-value pair goes on its own line, and every nested object is expanded.
+
+2. Never use `{ ... }` or `[ { ... } ]` as placeholder dummy data. Always write out realistic example values for every field shown in the schema.
+
+```json
+// ✅ correct
+{
+  "success": true,
+  "message": "Item created successfully",
+  "data": {
+    "item": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "name": "Tusker Lager",
+      "isActive": true,
+      "createdAt": "2026-07-27T10:00:00.000Z"
+    }
+  }
+}
+
+// ❌ wrong — compressed
+{ "success": true, "message": "Item created successfully", "data": { "item": { ... } } }
+
+// ❌ wrong — placeholder dummy data
+{
+  "success": true,
+  "data": {
+    "item": { ... }
+  }
+}
+```
+
 ````markdown
 # 🗂️ POS API - Item Management Documentation
 

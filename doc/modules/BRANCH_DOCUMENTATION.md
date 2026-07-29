@@ -407,10 +407,184 @@ import { authenticateToken, authorizeRoles } from "../middleware/auth";
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /api/branches:
+ *   get:
+ *     summary: Get all branches
+ *     tags: [Branches]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer }
+ *         description: Page number (default 1)
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer }
+ *         description: Results per page (default 10)
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Search by name or code
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [active, inactive] }
+ *         description: Filter by active status
+ *     responses:
+ *       200:
+ *         description: Branches retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ */
 router.get("/", authenticateToken, authorizeRoles(["admin", "manager"]), getAllBranches);
+
+/**
+ * @swagger
+ * /api/branches/{branchId}:
+ *   get:
+ *     summary: Get a branch by ID
+ *     tags: [Branches]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: branchId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Branch document ID
+ *     responses:
+ *       200:
+ *         description: Branch retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Branch not found
+ */
 router.get("/:branchId", authenticateToken, authorizeRoles(["admin", "manager"]), getBranchById);
+
+/**
+ * @swagger
+ * /api/branches:
+ *   post:
+ *     summary: Create a new branch
+ *     tags: [Branches]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               addressId:
+ *                 type: string
+ *                 description: ID of a saved Address document
+ *               isMain:
+ *                 type: boolean
+ *               isActive:
+ *                 type: boolean
+ *     responses:
+ *       201:
+ *         description: Branch created successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       409:
+ *         description: Branch with this name already exists
+ */
 router.post("/", authenticateToken, authorizeRoles(["admin"]), createBranch);
+
+/**
+ * @swagger
+ * /api/branches/{branchId}:
+ *   put:
+ *     summary: Update a branch
+ *     tags: [Branches]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: branchId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               addressId:
+ *                 type: string
+ *               isMain:
+ *                 type: boolean
+ *               isActive:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Branch updated successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Branch not found
+ *       409:
+ *         description: Branch with this name already exists
+ */
 router.put("/:branchId", authenticateToken, authorizeRoles(["admin"]), updateBranch);
+
+/**
+ * @swagger
+ * /api/branches/{branchId}:
+ *   delete:
+ *     summary: Delete a branch
+ *     tags: [Branches]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: branchId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Branch deleted
+ *       400:
+ *         description: Main branch cannot be deleted
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Branch not found
+ */
 router.delete("/:branchId", authenticateToken, authorizeRoles(["admin"]), deleteBranch);
 
 export default router;
@@ -469,7 +643,10 @@ export default router;
       "email": "main@pos.com",
       "isMain": true,
       "isActive": true,
-      "address": { "_id": "7749c3d4e5f6g7h8i9j0k1l2", "name": "Headquarters" }
+      "address": {
+        "_id": "7749c3d4e5f6g7h8i9j0k1l2",
+        "name": "Headquarters"
+      }
     }
   }
 }
@@ -561,43 +738,154 @@ export default router;
 ### Get All Branches
 ```bash
 curl -X GET "http://localhost:3500/api/branches?page=1&limit=10&status=active" \
-  -H "Authorization: Bearer <token>"
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "branches": [
+      {
+        "_id": "6638b2c3d4e5f6a7b8c9d0e1",
+        "name": "Main Branch",
+        "code": "MBR",
+        "phone": "+254700000000",
+        "email": "main@posapi.com",
+        "isMain": true,
+        "isActive": true,
+        "address": {
+          "_id": "7749c3d4e5f6a7b8c9d0e1f2",
+          "name": "Headquarters",
+          "location": {
+            "_id": "8850d4e5f6a7b8c9d0e1f2g3",
+            "name": "Nairobi",
+            "formattedAddress": "Nairobi, Kenya"
+          }
+        },
+        "createdAt": "2026-07-01T08:00:00.000Z",
+        "updatedAt": "2026-07-27T08:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 1,
+      "totalBranches": 1,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    }
+  }
+}
 ```
 
 ### Get Branch by ID
 ```bash
-curl -X GET http://localhost:3500/api/branches/6638b2c3d4e5f6g7h8i9j0k1 \
-  -H "Authorization: Bearer <token>"
+curl -X GET http://localhost:3500/api/branches/6638b2c3d4e5f6a7b8c9d0e1 \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "branch": {
+      "_id": "6638b2c3d4e5f6a7b8c9d0e1",
+      "name": "Main Branch",
+      "code": "MBR",
+      "phone": "+254700000000",
+      "email": "main@posapi.com",
+      "isMain": true,
+      "isActive": true,
+      "address": {
+        "_id": "7749c3d4e5f6a7b8c9d0e1f2",
+        "name": "Headquarters",
+        "location": {
+          "_id": "8850d4e5f6a7b8c9d0e1f2g3",
+          "name": "Nairobi",
+          "formattedAddress": "Nairobi, Kenya"
+        }
+      },
+      "createdAt": "2026-07-01T08:00:00.000Z",
+      "updatedAt": "2026-07-27T08:00:00.000Z"
+    }
+  }
+}
 ```
 
 ### Create Branch
 ```bash
 curl -X POST http://localhost:3500/api/branches \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "name": "Westlands Branch",
     "code": "WBR",
     "phone": "+254711111111",
-    "addressId": "7749c3d4e5f6g7h8i9j0k1l2"
+    "addressId": "7749c3d4e5f6a7b8c9d0e1f2"
   }'
+```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Branch created successfully",
+  "data": {
+    "branch": {
+      "_id": "9961e5f6a7b8c9d0e1f2g3h4",
+      "name": "Westlands Branch",
+      "code": "WBR",
+      "phone": "+254711111111",
+      "email": null,
+      "isMain": false,
+      "isActive": true,
+      "createdAt": "2026-07-27T10:00:00.000Z",
+      "updatedAt": "2026-07-27T10:00:00.000Z"
+    }
+  }
+}
 ```
 
 ### Update Branch
 ```bash
-curl -X PUT http://localhost:3500/api/branches/9961e5f6g7h8i9j0k1l2m3n4 \
+curl -X PUT http://localhost:3500/api/branches/9961e5f6a7b8c9d0e1f2g3h4 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "phone": "+254722222222",
     "isActive": false
   }'
 ```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Branch updated successfully",
+  "data": {
+    "branch": {
+      "_id": "9961e5f6a7b8c9d0e1f2g3h4",
+      "name": "Westlands Branch",
+      "code": "WBR",
+      "phone": "+254722222222",
+      "isMain": false,
+      "isActive": false,
+      "createdAt": "2026-07-27T10:00:00.000Z",
+      "updatedAt": "2026-07-27T10:30:00.000Z"
+    }
+  }
+}
+```
 
 ### Delete Branch
 ```bash
-curl -X DELETE http://localhost:3500/api/branches/9961e5f6g7h8i9j0k1l2m3n4 \
-  -H "Authorization: Bearer <token>"
+curl -X DELETE http://localhost:3500/api/branches/9961e5f6a7b8c9d0e1f2g3h4 \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Branch deleted"
+}
 ```
 
 ---
@@ -614,17 +902,20 @@ curl -X DELETE http://localhost:3500/api/branches/9961e5f6g7h8i9j0k1l2m3n4 \
 
 Common responses:
 ```json
-{ "success": false, "message": "Branch name is required" }
-{ "success": false, "message": "Branch with this name already exists" }
-{ "success": false, "message": "Address not found" }
-{ "success": false, "message": "Branch not found" }
-{ "success": false, "message": "Main branch cannot be deleted" }
+{
+  "success": false,
+  "message": "..."
+}
 ```
 
-- `400 Bad Request`: Missing required fields or attempting to delete main branch.
-- `404 Not Found`: Branch or Address not found.
-- `409 Conflict`: Branch name already exists.
-- `500 Internal Server Error`: Unexpected server-side error.
+| Status | Scenario |
+|--------|----------|
+| 400 | Branch name is required; attempting to delete main branch |
+| 401 | Missing or invalid JWT |
+| 403 | Authenticated but wrong role |
+| 404 | Branch not found; Address not found |
+| 409 | Branch with this name already exists |
+| 500 | Internal server error |
 
 ---
 
