@@ -38,7 +38,6 @@ const branchSchema = new Schema<IBranch>(
   { timestamps: true }
 );
 
-branchSchema.index({ name: 1 });
 branchSchema.index({ isActive: 1 });
 branchSchema.index({ isMain: 1 });
 branchSchema.index({ address: 1 });
