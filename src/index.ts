@@ -14,6 +14,7 @@ import branchRoutes from "./routes/branchRoutes";
 import userRoutes from "./routes/userRoutes";
 import shiftRoutes from "./routes/shiftRoutes";
 import categoryRoutes from "./routes/categoryRoutes";
+import variantRoutes from "./routes/variantRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -115,6 +116,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/shifts", shiftRoutes);
 
 app.use("/api/categories", categoryRoutes);
+
+app.use("/api/variants", variantRoutes);
 
 
 

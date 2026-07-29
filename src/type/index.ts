@@ -1,5 +1,6 @@
 import { Document, Types } from "mongoose";
 
+// Role
 export type UserRole =
   | "bartender"
   | "cashier"
@@ -16,6 +17,7 @@ export interface IRole extends Document {
   updatedAt: Date;
 }
 
+// User
 export interface IUser extends Document {
   firstName: string;
   lastName: string;
@@ -36,6 +38,7 @@ export interface IUser extends Document {
   updatedAt: Date;
 }
 
+// Location
 export interface ILocationRegions {
   country: string;
   locality?: string;
@@ -59,6 +62,7 @@ export interface ILocation extends Document {
   updatedAt: Date;
 }
 
+// Address
 export interface IAddress extends Document {
   userId: Types.ObjectId;
   name: string;
@@ -69,6 +73,7 @@ export interface IAddress extends Document {
   updatedAt: Date;
 }
 
+// Branch
 export interface IBranch extends Document {
   name: string;
   code?: string;
@@ -81,6 +86,7 @@ export interface IBranch extends Document {
   updatedAt: Date;
 }
 
+// Category
 export interface ICategory extends Document {
   name: string;
   description: string;
@@ -89,6 +95,23 @@ export interface ICategory extends Document {
   updatedAt: Date;
 }
 
+// Variant
+export interface IOption {
+  _id: Types.ObjectId;
+  value: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface IVariant extends Document {
+  name: string;
+  options: Types.DocumentArray<IOption & Document>;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Shift
 export type ShiftStatus = "open" | "closed";
 
 export interface IShift extends Document {

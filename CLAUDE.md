@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - [Pagination](#pagination)
   - [Routes Structure](#routes-structure)
   - [Middleware Chain Order](#middleware-chain-order)
+  - [Type File Structure](#type-file-structure)
 - [Error Handling](#error-handling)
 - [Real-time (Socket.io)](#real-time-socketio)
 - [API Documentation](#api-documentation)
@@ -335,6 +336,36 @@ On protected routes:
 ```
 authenticateToken → authorizeRoles(...) → requireBranchAccess → requireActiveShift (tab routes only) → handler
 ```
+
+---
+
+### Type File Structure
+All TypeScript interfaces and types live in `src/type/index.ts`. Each module's types are separated by a single-line comment using the module name:
+
+```typescript
+// Role
+export type UserRole = ...
+export interface IRole extends Document { ... }
+
+// User
+export interface IUser extends Document { ... }
+
+// Branch
+export interface IBranch extends Document { ... }
+
+// Category
+export interface ICategory extends Document { ... }
+
+// Variant
+export interface IOption { ... }
+export interface IVariant extends Document { ... }
+
+// Shift
+export type ShiftStatus = ...
+export interface IShift extends Document { ... }
+```
+
+When adding a new module, append its comment header and interfaces at the bottom of the file (above existing modules only if there is a dependency ordering reason — otherwise append).
 
 ---
 

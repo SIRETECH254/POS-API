@@ -191,7 +191,32 @@ interface ICategory {
 
 ---
 
-### 5. Product Model
+### 5. Variant Model
+```typescript
+interface IOption {
+  value: string;       // e.g. "250ml", "750ml", "1L", "Lime", "Original"
+  isActive: boolean;
+  sortOrder: number;
+}
+
+interface IVariant {
+  _id: ObjectId;
+  name: string;        // e.g. "Size", "Flavour", "Strength"
+  options: IOption[];
+  sortOrder: number;   // controls display order across all variants
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Notes:**
+- Shared across all branches — a variant is a catalog concept, not a per-branch one. A "Size" variant (250ml / 750ml / 1L) can be attached to any SKU that comes in multiple sizes regardless of which branch stocks it.
+- Options are embedded sub-documents. Each option can be individually deactivated (e.g. 250ml discontinued) without deleting the variant or touching other options.
+- `sortOrder` on both the variant and each option controls display ordering in menus and dropdowns — lower values appear first.
+- A SKU that has no variants (e.g. a single-size product) simply has no variant references; variants are optional at the SKU level.
+
+---
+
+### 6. Product Model
 ```typescript
 interface IProduct {
   _id: ObjectId;
@@ -210,7 +235,7 @@ interface IProduct {
 
 ---
 
-### 6. SKU Model
+### 7. SKU Model
 ```typescript
 interface ISku {
   _id: ObjectId;
@@ -239,7 +264,7 @@ interface ISku {
 
 ---
 
-### 7. Supplier Model
+### 8. Supplier Model
 ```typescript
 interface ISupplier {
   _id: ObjectId;
@@ -259,7 +284,7 @@ interface ISupplier {
 
 ---
 
-### 8. Tab Model (Sale Tab — the core entity)
+### 9. Tab Model (Sale Tab — the core entity)
 ```typescript
 interface ITab {
   _id: ObjectId;
@@ -305,7 +330,7 @@ interface ITab {
 
 ---
 
-### 9. Payment Model
+### 10. Payment Model
 ```typescript
 interface IPayment {
   _id: ObjectId;
@@ -345,7 +370,7 @@ interface IPayment {
 
 ---
 
-### 10. Purchase Model (Goods Received)
+### 11. Purchase Model (Goods Received)
 ```typescript
 interface IPurchase {
   _id: ObjectId;
@@ -373,7 +398,7 @@ interface IPurchase {
 
 ---
 
-### 11. StockMovement Model (Immutable Ledger)
+### 12. StockMovement Model (Immutable Ledger)
 ```typescript
 interface IStockMovement {
   _id: ObjectId;
@@ -395,7 +420,7 @@ interface IStockMovement {
 
 ---
 
-### 12. StockAdjustment Model
+### 13. StockAdjustment Model
 ```typescript
 interface IStockAdjustment {
   _id: ObjectId;
@@ -412,7 +437,7 @@ interface IStockAdjustment {
 
 ---
 
-### 13. StockCount Model (Monthly Stock-Take)
+### 14. StockCount Model (Monthly Stock-Take)
 ```typescript
 interface IStockCount {
   _id: ObjectId;
@@ -435,7 +460,7 @@ interface IStockCount {
 
 ---
 
-### 14. Transfer Model (Branch-to-Branch Stock Transfer)
+### 15. Transfer Model (Branch-to-Branch Stock Transfer)
 ```typescript
 interface ITransfer {
   _id: ObjectId;
@@ -454,7 +479,7 @@ interface ITransfer {
 
 ---
 
-### 15. Expense Model
+### 16. Expense Model
 ```typescript
 interface IExpense {
   _id: ObjectId;
@@ -474,7 +499,7 @@ interface IExpense {
 
 ---
 
-### 16. Shift Model
+### 17. Shift Model
 ```typescript
 interface IShift {
   _id: ObjectId;
@@ -509,7 +534,7 @@ interface IShift {
 
 ---
 
-### 17. AuditLog Model
+### 18. AuditLog Model
 ```typescript
 interface IAuditLog {
   _id: ObjectId;
@@ -528,7 +553,7 @@ interface IAuditLog {
 
 ---
 
-### 18. Notification Model
+### 19. Notification Model
 ```typescript
 interface INotification {
   _id: ObjectId;
@@ -548,7 +573,7 @@ interface INotification {
 
 ---
 
-### 19. Receipt Model
+### 20. Receipt Model
 ```typescript
 interface IReceipt {
   _id: ObjectId;
@@ -565,7 +590,7 @@ interface IReceipt {
 
 ---
 
-### 20. Settings Model (one document per branch)
+### 21. Settings Model (one document per branch)
 ```typescript
 interface ISettings {
   _id: ObjectId;
@@ -588,7 +613,7 @@ interface ISettings {
 
 ---
 
-### 21. Location Model
+### 22. Location Model
 ```typescript
 interface ILocation {
   _id: ObjectId;
@@ -613,7 +638,7 @@ interface ILocation {
 
 ---
 
-### 22. Address Model
+### 23. Address Model
 ```typescript
 interface IAddress {
   _id: ObjectId;
@@ -630,7 +655,7 @@ interface IAddress {
 
 ---
 
-### 23. Branch Model *(implemented)*
+### 24. Branch Model *(implemented)*
 ```typescript
 interface IBranch {
   _id: ObjectId;
@@ -693,10 +718,21 @@ interface IBranch {
 ### 6. Category Controller — `categoryController.ts`
 - `createCategory()`
 - `getAllCategories()`
+- `getCategoryById()`
 - `updateCategory()`
 - `deleteCategory()`
 
-### 7. Product Controller — `productController.ts`
+### 7. Variant Controller — `variantController.ts`
+- `createVariant()` — create a new variant with an initial set of options
+- `getAllVariants()` — paginated list, filterable by search
+- `getVariantById()` — fetch a single variant with all its options
+- `updateVariant()` — update variant name or sortOrder
+- `deleteVariant()` — remove variant entirely
+- `addOption()` — append a new option to an existing variant
+- `updateOption()` — update an option's value, sortOrder, or isActive
+- `removeOption()` — delete a single option from a variant
+
+### 8. Product Controller — `productController.ts`
 - `createProduct()`
 - `getAllProducts()`
 - `getProduct()`
@@ -704,7 +740,7 @@ interface IBranch {
 - `deleteProduct()`
 - `uploadProductImage()`
 
-### 8. SKU Controller — `skuController.ts`
+### 9. SKU Controller — `skuController.ts`
 - `createSku()`
 - `getAllSkus()`
 - `getSku()`
@@ -714,7 +750,7 @@ interface IBranch {
 - `searchByBarcode()` — scoped to the requesting branch
 - `setBranchStockLevel()` — admin/manager utility to initialize or correct `stockByBranch` for a new branch/SKU pairing
 
-### 9. Tab Controller — `tabController.ts`
+### 10. Tab Controller — `tabController.ts`
 - `createTab()` — opens a new tab at the bartender's branch, requires active shift
 - `addItem()`
 - `updateItemQuantity()`
@@ -730,7 +766,7 @@ interface IBranch {
 - `getTab()`
 - `getTabHistory()`
 
-### 10. Payment Controller — `paymentController.ts`
+### 11. Payment Controller — `paymentController.ts`
 - `payCash()` — receive amount, calculate change, open cash drawer signal
 - `initiateMpesaPayment()` — STK Push
 - `mpesaCallback()` — Daraja webhook, confirms/fails payment, auto-completes Tab when `amountPaid >= grandTotal`
@@ -741,7 +777,7 @@ interface IBranch {
 - `getPayment()`
 - `getTabPayments()`
 
-### 11. Supplier Controller — `supplierController.ts`
+### 12. Supplier Controller — `supplierController.ts`
 - `createSupplier()`
 - `getAllSuppliers()`
 - `getSupplier()`
@@ -749,14 +785,14 @@ interface IBranch {
 - `deleteSupplier()`
 - `getSupplierHistory()` — invoices, purchases, outstanding balance
 
-### 12. Purchase Controller — `purchaseController.ts`
+### 13. Purchase Controller — `purchaseController.ts`
 - `createPurchaseOrder()`
 - `receiveGoods()` — updates branch stock + supplier ledger
 - `getAllPurchases()`
 - `getPurchase()`
 - `recordSupplierPayment()`
 
-### 13. Inventory Controller — `inventoryController.ts`
+### 14. Inventory Controller — `inventoryController.ts`
 - `getStockMovements()` — filterable ledger view, scoped to branch
 - `createStockAdjustment()`
 - `approveStockAdjustment()`
@@ -767,7 +803,7 @@ interface IBranch {
 - `dispatchTransfer()`
 - `receiveTransfer()`
 
-### 14. Expense Controller — `expenseController.ts`
+### 15. Expense Controller — `expenseController.ts`
 - `createExpense()`
 - `getAllExpenses()`
 - `getExpense()`
@@ -775,7 +811,7 @@ interface IBranch {
 - `deleteExpense()`
 - `approveExpense()`
 
-### 15. Shift Controller — `shiftController.ts`
+### 16. Shift Controller — `shiftController.ts`
 - `startShift()` — records opening float, at the staff member's branch
 - `endShift()` — computes expected vs actual cash, flags variance
 - `getActiveShifts()`
@@ -783,7 +819,7 @@ interface IBranch {
 - `getShift()`
 - `reviewVariance()` — manager investigates and closes out a variance
 
-### 16. Report Controller — `reportController.ts`
+### 17. Report Controller — `reportController.ts`
 - `getSalesReport(range)`
 - `getProductReport()` — best sellers / slow movers / never sold
 - `getPaymentReport()`
@@ -793,7 +829,7 @@ interface IBranch {
 - `getSupplierReport()`
 - All accept an optional `branch` filter; admins can request a consolidated multi-branch view
 
-### 17. Analytics Controller — `analyticsController.ts`
+### 18. Analytics Controller — `analyticsController.ts`
 - `getSalesTrend()`
 - `getProfitTrend()`
 - `getPeakHours()`
@@ -802,14 +838,14 @@ interface IBranch {
 - `getInventoryValueTrend()`
 - `getBranchComparison()` — side-by-side branch performance, admin only
 
-### 18. Receipt Controller — `receiptController.ts`
+### 19. Receipt Controller — `receiptController.ts`
 - `generateReceipt()`
 - `printReceipt()`
 - `reprintReceipt()`
 - `generateRefundReceipt()`
 - `emailReceipt()` — digital receipt, future
 
-### 19. Notification Controller — `notificationController.ts`
+### 20. Notification Controller — `notificationController.ts`
 - `getMyNotifications()`
 - `getUnreadCount()`
 - `markAsRead()`
@@ -817,22 +853,22 @@ interface IBranch {
 - `sendLowStockAlert()` — cron-triggered, per branch
 - `sendDailySummary()` — cron-triggered, per branch
 
-### 20. Audit Controller — `auditController.ts`
+### 21. Audit Controller — `auditController.ts`
 - `getAuditLogs()` — filterable by branch/user/entity/date, admin & manager only
 - `getEntityHistory(entityType, entityId)`
 
-### 21. Settings Controller — `settingsController.ts`
+### 22. Settings Controller — `settingsController.ts`
 - `getSettings(branchId)`
 - `updateSettings(branchId)`
 - `updatePrinterConfig()`
 - `updateReceiptLayout()`
 
-### 22. Location Controller — `locationController.ts` *(implemented)*
+### 23. Location Controller — `locationController.ts` *(implemented)*
 - `searchLocation()` — proxy Google Maps Text Search (public)
 - `saveLocation()` — persist a selected place to the database (authenticated)
 - `getLocationById()` — fetch a saved location by ID (authenticated)
 
-### 23. Address Controller — `addressController.ts` *(implemented)*
+### 24. Address Controller — `addressController.ts` *(implemented)*
 - `getUserAddresses()` — list authenticated user's addresses with pagination
 - `getAddressById()` — fetch a single address (scoped to owner)
 - `createAddress()` — create address linked to a Location document via `locationId`
@@ -840,7 +876,7 @@ interface IBranch {
 - `deleteAddress()` — delete address (scoped to owner)
 - `setDefaultAddress()` — mark address as default; pre-save hook unsets previous default
 
-### 24. Branch Controller — `branchController.ts` *(implemented)*
+### 25. Branch Controller — `branchController.ts` *(implemented)*
 - `getAllBranches()` — paginated, filterable list; main branch sorted first
 - `getBranchById()` — fetch branch with populated address and location
 - `createBranch()` — admin only; unique name guard; accepts `addressId`
@@ -911,8 +947,22 @@ GET    /manager
 ```
 POST   /                          // manager/admin
 GET    /
+GET    /:categoryId
 PUT    /:categoryId
 DELETE /:categoryId
+```
+
+### Variant Routes
+**Base:** `/api/variants`
+```
+POST   /                                         // manager/admin
+GET    /
+GET    /:variantId
+PUT    /:variantId                               // manager/admin
+DELETE /:variantId                               // admin only
+POST   /:variantId/options                       // add option (manager/admin)
+PUT    /:variantId/options/:optionId             // update option (manager/admin)
+DELETE /:variantId/options/:optionId             // remove option (admin only)
 ```
 
 ### Product Routes
@@ -1141,6 +1191,7 @@ club-pos-api/
 │   │   ├── Role.ts
 │   │   ├── Branch.ts
 │   │   ├── Category.ts
+│   │   ├── Variant.ts
 │   │   ├── Product.ts
 │   │   ├── Sku.ts
 │   │   ├── Supplier.ts
@@ -1164,6 +1215,7 @@ club-pos-api/
 │   │   ├── branchController.ts
 │   │   ├── dashboardController.ts
 │   │   ├── categoryController.ts
+│   │   ├── variantController.ts
 │   │   ├── productController.ts
 │   │   ├── skuController.ts
 │   │   ├── tabController.ts
@@ -1186,6 +1238,7 @@ club-pos-api/
 │   │   ├── branchRoutes.ts
 │   │   ├── dashboardRoutes.ts
 │   │   ├── categoryRoutes.ts
+│   │   ├── variantRoutes.ts
 │   │   ├── productRoutes.ts
 │   │   ├── skuRoutes.ts
 │   │   ├── tabRoutes.ts
