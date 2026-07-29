@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { errorHandler } from "../middleware/errorHandler";
 import Branch from "../models/Branch";
 import Address from "../models/Address";
+import { generateBranchCode } from "../utils/numberGenerators";
 
 /**
  * Get all branches
@@ -99,13 +100,13 @@ export const getBranchById = async (req: Request, res: Response, next: NextFunct
  * Purpose: Create a new branch record
  * Access: Admin
  * Validation: name is required; name must be unique; address must exist if provided
- * Process: Create and save branch
+ * Process: Auto-generate branch code from name, create and save branch
  * Response: Created branch
  */
 export const createBranch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // Extract fields from body
-    const { name, code, phone, email, addressId, isMain, isActive } = req.body;
+    // Extract fields from body — code is auto-generated, not accepted from client
+    const { name, phone, email, addressId, isMain, isActive } = req.body;
 
     // Guard — name required
     if (!name) {
@@ -125,6 +126,9 @@ export const createBranch = async (req: Request, res: Response, next: NextFuncti
         return next(errorHandler(404, "Address not found"));
       }
     }
+
+    // Auto-generate unique branch code from the branch name
+    const code = await generateBranchCode(name);
 
     // Create branch
     const branch = await Branch.create({
@@ -158,8 +162,8 @@ export const createBranch = async (req: Request, res: Response, next: NextFuncti
  */
 export const updateBranch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // Extract fields from body
-    const { name, code, phone, email, addressId, isMain, isActive } = req.body;
+    // Extract fields from body — code is immutable after creation
+    const { name, phone, email, addressId, isMain, isActive } = req.body;
 
     // Find branch
     const branch = await Branch.findById(req.params.branchId);
@@ -188,9 +192,6 @@ export const updateBranch = async (req: Request, res: Response, next: NextFuncti
     // Apply updates
     if (name !== undefined) {
       branch.name = name;
-    }
-    if (code !== undefined) {
-      branch.code = code;
     }
     if (phone !== undefined) {
       branch.phone = phone;

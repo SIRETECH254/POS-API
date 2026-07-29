@@ -80,3 +80,33 @@ export interface IBranch extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type ShiftStatus = "open" | "closed";
+
+export interface IShift extends Document {
+  branch: Types.ObjectId | IBranch;
+  shiftNumber: string;
+  staff: Types.ObjectId | IUser;
+  openingFloat: number;
+  closingCash: {
+    expected: number;
+    actual: number;
+    variance: number;
+  };
+  salesSummary: {
+    totalSales: number;
+    cashSales: number;
+    mpesaSales: number;
+    cardSales: number;
+    tabsOpened: number;
+    tabsCancelled: number;
+    discountsGiven: number;
+  };
+  status: ShiftStatus;
+  startedAt: Date;
+  endedAt?: Date;
+  closedBy?: Types.ObjectId | IUser;
+  varianceReviewedBy?: Types.ObjectId | IUser;
+  varianceNotes?: string;
+  createdAt: Date;
+}

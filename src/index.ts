@@ -12,6 +12,7 @@ import locationRoutes from "./routes/locationRoutes";
 import addressRoutes from "./routes/addressRoutes";
 import branchRoutes from "./routes/branchRoutes";
 import userRoutes from "./routes/userRoutes";
+import shiftRoutes from "./routes/shiftRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -109,6 +110,8 @@ app.use("/api/addresses", addressRoutes);
 app.use("/api/branches", branchRoutes);
 
 app.use("/api/users", userRoutes);
+
+app.use("/api/shifts", shiftRoutes);
 
 
 
