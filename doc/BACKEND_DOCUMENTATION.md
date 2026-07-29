@@ -273,7 +273,7 @@ interface ISupplier {
   contactPerson: string;
   phone: string;
   email: string;
-  address: string;
+  address?: ObjectId; // ref: Address — supplier physical address (optional)
   skusSupplied: ObjectId[]; // ref: SKU
   branches: ObjectId[]; // ref: Branch — which branches this supplier delivers to
   outstandingBalance: number; // recalculated from unpaid Purchases

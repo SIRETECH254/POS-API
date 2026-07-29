@@ -186,3 +186,18 @@ export interface IShift extends Document {
   varianceNotes?: string;
   createdAt: Date;
 }
+
+// Supplier
+export interface ISupplier extends Document {
+  companyName: string;
+  contactPerson: string;
+  phone: string;
+  email?: string;
+  address?: Types.ObjectId | IAddress;
+  skusSupplied: Types.ObjectId[];
+  branches: Types.ObjectId[];
+  outstandingBalance: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
