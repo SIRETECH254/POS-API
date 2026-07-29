@@ -111,6 +111,51 @@ export interface IVariant extends Document {
   updatedAt: Date;
 }
 
+// Product
+export type ProductStatus = "active" | "inactive" | "discontinued";
+export type SkuUnit = "bottle" | "shot" | "pack" | "plate" | "crate" | "unit";
+
+export interface ISKUAttribute {
+  variantId: Types.ObjectId;
+  optionId: Types.ObjectId;
+}
+
+export interface IStockByBranch {
+  branch: Types.ObjectId | IBranch;
+  currentStock: number;
+  minimumStock: number;
+}
+
+export interface ISKU extends Document {
+  attributes: ISKUAttribute[];
+  skuCode: string;
+  barcode?: string;
+  unit: SkuUnit;
+  buyingPrice: number;
+  sellingPrice: number;
+  supplier?: Types.ObjectId;
+  stockByBranch: Types.DocumentArray<IStockByBranch & Document>;
+  status: ProductStatus;
+  isActive: boolean;
+  createdBy: Types.ObjectId | IUser;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IProduct extends Document {
+  name: string;
+  category: Types.ObjectId | ICategory;
+  variants: Types.ObjectId[] | IVariant[];
+  description: string;
+  image?: string;
+  imagePublicId?: string;
+  status: ProductStatus;
+  createdBy: Types.ObjectId | IUser;
+  skus: Types.DocumentArray<ISKU>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Shift
 export type ShiftStatus = "open" | "closed";
 

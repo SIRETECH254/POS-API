@@ -222,6 +222,7 @@ interface IProduct {
   _id: ObjectId;
   name: string;
   category: ObjectId; // ref: Category
+  variants: ObjectId[]; // ref: Variant
   description: string;
   image: string;
   status: 'active' | 'inactive' | 'discontinued';
