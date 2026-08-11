@@ -201,3 +201,33 @@ export interface ISupplier extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// StockMovement
+export type StockMovementType =
+  | "purchased"
+  | "sold"
+  | "adjusted"
+  | "returned"
+  | "damaged"
+  | "transferred_out"
+  | "transferred_in";
+
+export type StockMovementRefType = "Purchase" | "Tab" | "StockAdjustment" | "Transfer";
+
+export interface IStockMovementReference {
+  refType?: StockMovementRefType;
+  refId?: Types.ObjectId;
+}
+
+export interface IStockMovement extends Document {
+  branch: Types.ObjectId | IBranch;
+  product: Types.ObjectId | IProduct;
+  sku: Types.ObjectId;
+  type: StockMovementType;
+  quantity: number;
+  balanceAfter: number;
+  reference?: IStockMovementReference;
+  reason?: string;
+  performedBy: Types.ObjectId | IUser;
+  createdAt: Date;
+}
