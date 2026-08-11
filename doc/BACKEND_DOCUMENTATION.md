@@ -703,6 +703,75 @@ interface IPurchase {
 
 ---
 
+### 27. StockAdjustment Model *(implemented)*
+```typescript
+interface IStockAdjustment {
+  _id: ObjectId;
+  branch: ObjectId;         // ref: Branch
+  product: ObjectId;        // ref: Product
+  sku: ObjectId;             // embedded SKU subdocument id on Product.skus — no separate Sku collection
+  quantityChange: number;   // signed — negative for breakage/theft/loss, positive for corrections
+  reason: 'breakage' | 'theft' | 'expired' | 'count_correction' | 'other';
+  notes?: string;            // required by the controller when reason is 'other'
+  adjustedBy: ObjectId;      // ref: User
+  approvedBy?: ObjectId;     // ref: User — set only for negative adjustments, at approval time
+  appliedAt?: Date;          // set when the stock movement is actually written
+  stockCount?: ObjectId;     // ref: StockCount — set when auto-generated during reconciliation
+  createdAt: Date;
+}
+```
+**Notes:** `product`, `appliedAt`, and `stockCount` are additions beyond the original target design (see `doc/modules/inventory/STOCKADJUSTMENT_DOCUMENTATION.md` for why). Positive `quantityChange` applies immediately via `stockMovementService.recordStockMovement()`; negative `quantityChange` is created pending and requires `approveStockAdjustment()` by a manager/admin.
+
+---
+
+### 28. StockCount Model *(implemented)*
+```typescript
+interface IStockCount {
+  _id: ObjectId;
+  branch: ObjectId;          // ref: Branch
+  countNumber: string;       // branch-prefixed, e.g. "MAIN-SC-2026-0001"
+  items: Array<{
+    product: ObjectId;       // ref: Product
+    sku: ObjectId;            // embedded SKU subdocument id
+    expectedQuantity: number; // snapshotted system stock at start time
+    actualQuantity: number;   // physically counted, set on submit
+    variance: number;         // actual - expected
+  }>;
+  status: 'in_progress' | 'completed' | 'reconciled';
+  countedBy: ObjectId;        // ref: User
+  reviewedBy?: ObjectId;      // ref: User — set on reconcile
+  createdAt: Date;
+  completedAt?: Date;
+}
+```
+**Notes:** `startStockCount()` snapshots `expectedQuantity`; `submitStockCount()` records `actualQuantity`/`variance`, no stock touched; `reconcileStockCount()` (manager/admin only) generates a pre-approved `StockAdjustment` + `StockMovement` per non-zero variance line. See `doc/modules/inventory/STOCKCOUNT_DOCUMENTATION.md`.
+
+---
+
+### 29. Transfer Model *(implemented)*
+```typescript
+interface ITransfer {
+  _id: ObjectId;
+  transferNumber: string;    // branch-prefixed, e.g. "MAIN-TRF-2026-0001"
+  fromBranch: ObjectId;      // ref: Branch
+  toBranch: ObjectId;        // ref: Branch
+  items: Array<{
+    product: ObjectId;       // ref: Product
+    sku: ObjectId;            // embedded SKU subdocument id
+    quantity: number;
+  }>;
+  status: 'pending' | 'in_transit' | 'received' | 'cancelled';
+  createdBy: ObjectId;        // ref: User — addition beyond the original target design
+  sentBy?: ObjectId;          // ref: User — set on dispatch
+  receivedBy?: ObjectId;      // ref: User — set on receive
+  createdAt: Date;
+  receivedAt?: Date;
+}
+```
+**Notes:** `dispatchTransfer()` writes a `transferred_out` `StockMovement` against `fromBranch`; `receiveTransfer()` writes a `transferred_in` `StockMovement` against `toBranch` — both via `stockMovementService.recordStockMovement()`. No `cancelTransfer()` endpoint exists yet, so `'cancelled'` isn't currently reachable. See `doc/modules/inventory/TRANSFER_DOCUMENTATION.md`.
+
+---
+
 ## 🎮 Controllers
 
 ### 1. Auth Controller — `authController.ts`
@@ -832,6 +901,8 @@ interface IPurchase {
 - `dispatchTransfer()`
 - `receiveTransfer()`
 
+> **Implementation note:** this bundled controller was not built as-is. It was implemented as **four separate modules** instead, matching the rest of this codebase's one-model-per-file convention: `getStockMovements()` lives in its own `StockMovement` module (`stockMovementController.ts`, see `doc/modules/STOCKMOVEMENT_DOCUMENTATION.md`), and the remaining functions were split into `stockAdjustmentController.ts`, `stockCountController.ts`, and `transferController.ts` — see `doc/modules/inventory/`.
+
 ### 15. Expense Controller — `expenseController.ts`
 - `createExpense()`
 - `getAllExpenses()`
@@ -917,6 +988,24 @@ interface IPurchase {
 - `receiveGoods()` — store_keeper/manager/admin; guards `status === 'ordered'`; writes one `StockMovement` per item via `stockMovementService.recordStockMovement()`; marks `status: 'received'`
 - `getAllPurchases()` — store_keeper/manager/admin/accountant; filterable by branch/supplier/status/search, paginated
 - `getPurchaseById()` — store_keeper/manager/admin/accountant; populates branch, supplier, receivedBy, createdBy, and item products
+
+### 27. StockAdjustment Controller — `stockAdjustmentController.ts` *(implemented)*
+- `createStockAdjustment()` — store_keeper/manager/admin; positive `quantityChange` applies immediately, negative stays pending
+- `approveStockAdjustment()` — manager/admin only; applies a pending negative adjustment
+- `getAllStockAdjustments()` — store_keeper/manager/admin/accountant; filterable by branch/sku/reason/pending, paginated
+- `getStockAdjustmentById()` — same access
+
+### 28. StockCount Controller — `stockCountController.ts` *(implemented)*
+- `startStockCount()` — store_keeper/manager/admin; snapshots `expectedQuantity` per item, generates `countNumber`
+- `submitStockCount()` — store_keeper/manager/admin; records `actualQuantity`/`variance`, requires full item coverage
+- `reconcileStockCount()` — manager/admin only; generates pre-approved `StockAdjustment` + `StockMovement` per non-zero variance
+- `getAllStockCounts()` / `getStockCountById()` — store_keeper/manager/admin/accountant
+
+### 29. Transfer Controller — `transferController.ts` *(implemented)*
+- `createTransfer()` — store_keeper/manager/admin; validates both branches differ and exist, and each item's product+SKU
+- `dispatchTransfer()` — store_keeper/manager/admin; writes `transferred_out` movement per item, marks `in_transit`
+- `receiveTransfer()` — store_keeper/manager/admin; writes `transferred_in` movement per item, marks `received`
+- `getAllTransfers()` / `getTransferById()` — store_keeper/manager/admin/accountant
 
 ---
 
@@ -1092,6 +1181,7 @@ POST   /transfers                     // between branches
 PATCH  /transfers/:id/dispatch
 PATCH  /transfers/:id/receive
 ```
+> **Implementation note:** not built as a single bundled `/api/inventory` router. `/movements` already exists as its own `/api/stock-movements` router; adjustments/stock-counts/transfers were implemented as their own routers at `/api/stock-adjustments`, `/api/stock-counts`, `/api/transfers` — see the `*(implemented)*` route sections below.
 
 ### Expense Routes
 **Base:** `/api/expenses`
@@ -1208,6 +1298,35 @@ GET    /                               // store_keeper/manager/admin/accountant 
 GET    /:purchaseId                    // store_keeper/manager/admin/accountant — purchase by ID
 POST   /                               // store_keeper/manager/admin — create purchase order
 PATCH  /:purchaseId/receive            // store_keeper/manager/admin — receive goods, increments stock
+```
+
+### StockAdjustment Routes *(implemented)*
+**Base:** `/api/stock-adjustments`
+```
+GET    /                               // store_keeper/manager/admin/accountant — list (paginated, filterable)
+GET    /:stockAdjustmentId             // store_keeper/manager/admin/accountant — adjustment by ID
+POST   /                               // store_keeper/manager/admin — create adjustment
+PATCH  /:stockAdjustmentId/approve     // manager/admin — approve pending negative adjustment
+```
+
+### StockCount Routes *(implemented)*
+**Base:** `/api/stock-counts`
+```
+GET    /                               // store_keeper/manager/admin/accountant — list (paginated, filterable)
+GET    /:stockCountId                  // store_keeper/manager/admin/accountant — stock count by ID
+POST   /                               // store_keeper/manager/admin — start stock count
+PATCH  /:stockCountId/submit           // store_keeper/manager/admin — submit counted quantities
+PATCH  /:stockCountId/reconcile        // manager/admin — reconcile, applies variance adjustments
+```
+
+### Transfer Routes *(implemented)*
+**Base:** `/api/transfers`
+```
+GET    /                               // store_keeper/manager/admin/accountant — list (paginated, filterable)
+GET    /:transferId                    // store_keeper/manager/admin/accountant — transfer by ID
+POST   /                               // store_keeper/manager/admin — create transfer
+PATCH  /:transferId/dispatch           // store_keeper/manager/admin — dispatch, decrements source stock
+PATCH  /:transferId/receive            // store_keeper/manager/admin — receive, increments destination stock
 ```
 
 ### Utility Routes

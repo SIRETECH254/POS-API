@@ -1,6 +1,8 @@
 import Branch from "../models/Branch";
 import Shift from "../models/Shift";
 import Purchase from "../models/Purchase";
+import StockCount from "../models/StockCount";
+import Transfer from "../models/Transfer";
 
 /**
  * Generate a unique branch code derived from the branch name.
@@ -89,4 +91,36 @@ export const generatePurchaseNumber = async (
   const count = await Purchase.countDocuments({ branch: branchId });
   const sequence = String(count + 1).padStart(4, "0");
   return `${code}-PO-${year}-${sequence}`;
+};
+
+/**
+ * Generate a branch-prefixed stock count number.
+ * Format: {BRANCH_CODE}-SC-{YYYY}-{NNNN}
+ * Example: MAIN-SC-2026-0001
+ */
+export const generateStockCountNumber = async (
+  branchCode: string | undefined,
+  branchId: string
+): Promise<string> => {
+  const code = branchCode || "BR";
+  const year = new Date().getFullYear();
+  const count = await StockCount.countDocuments({ branch: branchId });
+  const sequence = String(count + 1).padStart(4, "0");
+  return `${code}-SC-${year}-${sequence}`;
+};
+
+/**
+ * Generate a branch-prefixed transfer number.
+ * Format: {BRANCH_CODE}-TRF-{YYYY}-{NNNN}
+ * Example: MAIN-TRF-2026-0001
+ */
+export const generateTransferNumber = async (
+  branchCode: string | undefined,
+  branchId: string
+): Promise<string> => {
+  const code = branchCode || "BR";
+  const year = new Date().getFullYear();
+  const count = await Transfer.countDocuments({ fromBranch: branchId });
+  const sequence = String(count + 1).padStart(4, "0");
+  return `${code}-TRF-${year}-${sequence}`;
 };

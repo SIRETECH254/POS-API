@@ -259,3 +259,64 @@ export interface IPurchase extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// StockAdjustment
+export type StockAdjustmentReason = "breakage" | "theft" | "expired" | "count_correction" | "other";
+
+export interface IStockAdjustment extends Document {
+  branch: Types.ObjectId | IBranch;
+  product: Types.ObjectId | IProduct;
+  sku: Types.ObjectId;
+  quantityChange: number;
+  reason: StockAdjustmentReason;
+  notes?: string;
+  adjustedBy: Types.ObjectId | IUser;
+  approvedBy?: Types.ObjectId | IUser;
+  appliedAt?: Date;
+  stockCount?: Types.ObjectId | IStockCount;
+  createdAt: Date;
+}
+
+// StockCount
+export type StockCountStatus = "in_progress" | "completed" | "reconciled";
+
+export interface IStockCountItem {
+  product: Types.ObjectId | IProduct;
+  sku: Types.ObjectId;
+  expectedQuantity: number;
+  actualQuantity: number;
+  variance: number;
+}
+
+export interface IStockCount extends Document {
+  branch: Types.ObjectId | IBranch;
+  countNumber: string;
+  items: IStockCountItem[];
+  status: StockCountStatus;
+  countedBy: Types.ObjectId | IUser;
+  reviewedBy?: Types.ObjectId | IUser;
+  createdAt: Date;
+  completedAt?: Date;
+}
+
+// Transfer
+export type TransferStatus = "pending" | "in_transit" | "received" | "cancelled";
+
+export interface ITransferItem {
+  product: Types.ObjectId | IProduct;
+  sku: Types.ObjectId;
+  quantity: number;
+}
+
+export interface ITransfer extends Document {
+  transferNumber: string;
+  fromBranch: Types.ObjectId | IBranch;
+  toBranch: Types.ObjectId | IBranch;
+  items: ITransferItem[];
+  status: TransferStatus;
+  createdBy: Types.ObjectId | IUser;
+  sentBy?: Types.ObjectId | IUser;
+  receivedBy?: Types.ObjectId | IUser;
+  createdAt: Date;
+  receivedAt?: Date;
+}
