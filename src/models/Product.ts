@@ -156,13 +156,10 @@ const productSchema = new Schema<IProductDocument>(
 );
 
 // Indexes
-productSchema.index({ name: 1 });
 productSchema.index({ category: 1 });
 productSchema.index({ status: 1 });
 productSchema.index({ createdBy: 1 });
 productSchema.index({ createdAt: -1 });
-skuSchema.index({ skuCode: 1 });
-skuSchema.index({ barcode: 1 }, { sparse: true });
 
 /**
  * Generate or regenerate all SKUs based on the product's linked variants.

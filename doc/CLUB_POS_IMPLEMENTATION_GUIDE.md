@@ -235,7 +235,7 @@ audit) relies on.
 
 5. Model + Controller: `StockCount` — monthly stock-take, `startStockCount`
    → `submitStockCount` → `reconcileStockCount` (reconciliation generates
-   `StockAdjustment` + `StockMovement` entries automatically). Routes under
+   `StockAdjustment` + `StockMovement` entries automatically). Routes undero
    `/api/inventory/stock-counts`.
 
 6. Model + Controller: `Transfer` — branch-to-branch. `createTransfer` →

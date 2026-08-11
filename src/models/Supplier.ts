@@ -55,9 +55,6 @@ const supplierSchema = new Schema<ISupplier>(
   { timestamps: true }
 );
 
-supplierSchema.index({ companyName: 1 });
-supplierSchema.index({ phone: 1 });
-supplierSchema.index({ email: 1 }, { sparse: true });
 supplierSchema.index({ isActive: 1 });
 supplierSchema.index({ branches: 1 });
 

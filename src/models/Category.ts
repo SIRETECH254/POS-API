@@ -22,7 +22,6 @@ const categorySchema = new Schema<ICategory>(
   { timestamps: true }
 );
 
-categorySchema.index({ name: 1 });
 categorySchema.index({ isActive: 1 });
 
 const Category = mongoose.model<ICategory>("Category", categorySchema);

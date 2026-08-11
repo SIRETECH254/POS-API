@@ -40,7 +40,6 @@ const variantSchema = new Schema<IVariant>(
   { timestamps: true }
 );
 
-variantSchema.index({ name: 1 });
 variantSchema.index({ sortOrder: 1 });
 
 const Variant = mongoose.model<IVariant>("Variant", variantSchema);
