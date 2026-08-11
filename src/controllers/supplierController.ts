@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { errorHandler } from "../middleware/errorHandler";
 import Supplier from "../models/Supplier";
+import Purchase from "../models/Purchase";
 
 /**
  * Get all suppliers
@@ -307,10 +308,14 @@ export const getSupplierHistory = async (req: Request, res: Response, next: Next
       limit: parseInt(limit as string) || 10,
     };
 
-    // Purchase history will be fully populated once the Purchase module is implemented
-    const purchases: any[] = [];
-    const total = 0;
-    const totalPages = 0;
+    // Fetch purchase history for this supplier
+    const purchases = await Purchase.find({ supplier: supplier._id })
+      .populate("branch", "name code")
+      .sort({ createdAt: "desc" })
+      .limit(options.limit)
+      .skip((options.page - 1) * options.limit);
+    const total = await Purchase.countDocuments({ supplier: supplier._id });
+    const totalPages = Math.ceil(total / options.limit);
 
     // Return supplier history
     res.status(200).json({
@@ -323,8 +328,8 @@ export const getSupplierHistory = async (req: Request, res: Response, next: Next
           currentPage: options.page,
           totalPages,
           totalPurchases: total,
-          hasNextPage: false,
-          hasPrevPage: false,
+          hasNextPage: options.page < totalPages,
+          hasPrevPage: options.page > 1,
         },
       },
     });

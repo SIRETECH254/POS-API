@@ -231,3 +231,31 @@ export interface IStockMovement extends Document {
   performedBy: Types.ObjectId | IUser;
   createdAt: Date;
 }
+
+// Purchase
+export type PurchaseStatus = "ordered" | "received" | "cancelled";
+export type PurchasePaymentStatus = "unpaid" | "partial" | "paid";
+
+export interface IPurchaseItem {
+  product: Types.ObjectId | IProduct;
+  sku: Types.ObjectId;
+  quantity: number;
+  purchasePrice: number;
+  subtotal: number;
+}
+
+export interface IPurchase extends Document {
+  purchaseNumber: string;
+  branch: Types.ObjectId | IBranch;
+  supplier: Types.ObjectId | ISupplier;
+  items: IPurchaseItem[];
+  totalAmount: number;
+  amountPaid: number;
+  paymentStatus: PurchasePaymentStatus;
+  status: PurchaseStatus;
+  createdBy: Types.ObjectId | IUser;
+  receivedBy?: Types.ObjectId | IUser;
+  receivedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}

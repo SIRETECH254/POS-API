@@ -136,6 +136,7 @@ isActive:           { default: true }
 import type { Request, Response, NextFunction } from "express";
 import { errorHandler } from "../middleware/errorHandler";
 import Supplier from "../models/Supplier";
+import Purchase from "../models/Purchase";
 ```
 
 ### Functions Overview
@@ -437,13 +438,13 @@ export const deleteSupplier = async (req: Request, res: Response, next: NextFunc
 ---
 
 #### `getSupplierHistory()`
-**Purpose:** Fetch purchase history, invoices, and outstanding balance for a supplier
+**Purpose:** Fetch purchase history and outstanding balance for a supplier
 **Access:** Manager, Admin
 **Validation:** Supplier must exist
 **Process:** Find supplier, query purchase records (paginated), return summary
 **Response:** Supplier details, outstanding balance, and purchase history
 
-> **Note:** The `purchases` array is fully populated once the Purchase module is implemented. Until then the endpoint returns an empty array alongside the supplier's current `outstandingBalance`.
+> **Note:** `outstandingBalance` is still a raw stored field on `Supplier` — it is not recalculated here from the purchase history, since supplier payment recording is deferred to a future Invoice module (see `doc/modules/PURCHASE_DOCUMENTATION.md`). The `purchases` array itself is real, sourced from the `Purchase` collection.
 
 **Controller Implementation:**
 ```typescript
@@ -468,10 +469,14 @@ export const getSupplierHistory = async (req: Request, res: Response, next: Next
       limit: parseInt(limit as string) || 10,
     };
 
-    // Purchase history populated once Purchase module is implemented
-    const purchases: any[] = [];
-    const total = 0;
-    const totalPages = 0;
+    // Fetch purchase history for this supplier
+    const purchases = await Purchase.find({ supplier: supplier._id })
+      .populate("branch", "name code")
+      .sort({ createdAt: "desc" })
+      .limit(options.limit)
+      .skip((options.page - 1) * options.limit);
+    const total = await Purchase.countDocuments({ supplier: supplier._id });
+    const totalPages = Math.ceil(total / options.limit);
 
     // Return supplier history
     res.status(200).json({
@@ -484,8 +489,8 @@ export const getSupplierHistory = async (req: Request, res: Response, next: Next
           currentPage: options.page,
           totalPages,
           totalPurchases: total,
-          hasNextPage: false,
-          hasPrevPage: false,
+          hasNextPage: options.page < totalPages,
+          hasPrevPage: options.page > 1,
         },
       },
     });
@@ -730,11 +735,26 @@ export default router;
       "isActive": true
     },
     "outstandingBalance": 15000,
-    "purchases": [],
+    "purchases": [
+      {
+        "_id": "64f1a2b3c4d5e6f7a8b9c0f1",
+        "purchaseNumber": "MAIN-PO-2026-0001",
+        "branch": {
+          "_id": "64f1a2b3c4d5e6f7a8b9c0d3",
+          "name": "Main Branch",
+          "code": "MAIN"
+        },
+        "totalAmount": 4800,
+        "amountPaid": 0,
+        "paymentStatus": "unpaid",
+        "status": "received",
+        "createdAt": "2026-08-11T09:00:00.000Z"
+      }
+    ],
     "pagination": {
       "currentPage": 1,
-      "totalPages": 0,
-      "totalPurchases": 0,
+      "totalPages": 1,
+      "totalPurchases": 1,
       "hasNextPage": false,
       "hasPrevPage": false
     }

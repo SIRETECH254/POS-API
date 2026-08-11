@@ -378,7 +378,6 @@ interface IPurchase {
   purchaseNumber: string; // auto-generated, branch-prefixed, PO-YYYY-0001
   branch: ObjectId; // ref: Branch — receiving branch
   supplier: ObjectId; // ref: Supplier
-  invoiceRef: string; // supplier's invoice number
   items: Array<{
     sku: ObjectId; // ref: SKU
     quantity: number;
@@ -395,7 +394,7 @@ interface IPurchase {
   updatedAt: Date;
 }
 ```
-**Notes:** on `status: 'received'`, a `StockMovement` of type `purchased` is created per item and `SKU.stockByBranch[branch].currentStock` is incremented for the receiving branch — this is the only path stock enters the system.
+**Notes:** on `status: 'received'`, a `StockMovement` of type `purchased` is created per item and `SKU.stockByBranch[branch].currentStock` is incremented for the receiving branch — this is the only path stock enters the system. Tracking the supplier's actual invoice document (amount owed, due date, payment state, attached scan) and recording supplier payments against it are deferred to a future standalone Invoice module — not part of Purchase for now.
 
 ---
 
@@ -675,6 +674,35 @@ interface IBranch {
 
 ---
 
+### 26. Purchase Model *(implemented)*
+```typescript
+interface IPurchase {
+  _id: ObjectId;
+  purchaseNumber: string;   // auto-generated, branch-prefixed, e.g. "MAIN-PO-2026-0001"
+  branch: ObjectId;         // ref: Branch — receiving branch
+  supplier: ObjectId;       // ref: Supplier
+  items: Array<{
+    product: ObjectId;      // ref: Product
+    sku: ObjectId;          // embedded SKU subdocument id on Product.skus — no separate Sku collection
+    quantity: number;
+    purchasePrice: number;
+    subtotal: number;       // quantity * purchasePrice
+  }>;
+  totalAmount: number;
+  amountPaid: number;       // present on the model but not yet written to by any endpoint
+  paymentStatus: 'unpaid' | 'partial' | 'paid';
+  status: 'ordered' | 'received' | 'cancelled';
+  createdBy: ObjectId;      // ref: User
+  receivedBy?: ObjectId;    // ref: User
+  receivedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Notes:** No `invoiceRef` field and no `recordSupplierPayment()` in this pass — both were deliberately deferred to a future standalone Invoice module rather than being bolted onto Purchase. `receiveGoods()` writes one `StockMovement` (`type: 'purchased'`) per item via the shared `stockMovementService.recordStockMovement()`, which requires each item's branch/SKU `stockByBranch` entry to already exist (via `SKU.setBranchStockLevel`) — it will reject goods receipt for an uninitialized pairing rather than silently creating one. See `doc/modules/PURCHASE_DOCUMENTATION.md`.
+
+---
+
 ## 🎮 Controllers
 
 ### 1. Auth Controller — `authController.ts`
@@ -791,7 +819,7 @@ interface IBranch {
 - `receiveGoods()` — updates branch stock + supplier ledger
 - `getAllPurchases()`
 - `getPurchase()`
-- `recordSupplierPayment()`
+- `recordSupplierPayment()` — deferred alongside the future Invoice module; not built yet
 
 ### 14. Inventory Controller — `inventoryController.ts`
 - `getStockMovements()` — filterable ledger view, scoped to branch
@@ -883,6 +911,12 @@ interface IBranch {
 - `createBranch()` — admin only; unique name guard; accepts `addressId`
 - `updateBranch()` — admin only; unique name guard on change; verifies `addressId` if provided
 - `deleteBranch()` — admin only; blocked when `isMain: true`
+
+### 26. Purchase Controller — `purchaseController.ts` *(implemented)*
+- `createPurchaseOrder()` — store_keeper/manager/admin; validates branch/supplier/items, resolves each item's product+SKU, computes subtotals/total, generates `purchaseNumber`
+- `receiveGoods()` — store_keeper/manager/admin; guards `status === 'ordered'`; writes one `StockMovement` per item via `stockMovementService.recordStockMovement()`; marks `status: 'received'`
+- `getAllPurchases()` — store_keeper/manager/admin/accountant; filterable by branch/supplier/status/search, paginated
+- `getPurchaseById()` — store_keeper/manager/admin/accountant; populates branch, supplier, receivedBy, createdBy, and item products
 
 ---
 
@@ -1165,6 +1199,15 @@ GET    /:branchId                      // admin/manager — branch by ID
 POST   /                               // admin — create (body: name, addressId?)
 PUT    /:branchId                      // admin — update
 DELETE /:branchId                      // admin — delete (blocked if isMain)
+```
+
+### Purchase Routes *(implemented)*
+**Base:** `/api/purchases`
+```
+GET    /                               // store_keeper/manager/admin/accountant — list (paginated, filterable)
+GET    /:purchaseId                    // store_keeper/manager/admin/accountant — purchase by ID
+POST   /                               // store_keeper/manager/admin — create purchase order
+PATCH  /:purchaseId/receive            // store_keeper/manager/admin — receive goods, increments stock
 ```
 
 ### Utility Routes

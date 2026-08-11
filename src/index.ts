@@ -19,6 +19,7 @@ import productRoutes from "./routes/productRoutes";
 import skuRoutes from "./routes/skuRoutes";
 import supplierRoutes from "./routes/supplierRoutes";
 import stockMovementRoutes from "./routes/stockMovementRoutes";
+import purchaseRoutes from "./routes/purchaseRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -130,6 +131,8 @@ app.use("/api/skus", skuRoutes);
 app.use("/api/suppliers", supplierRoutes);
 
 app.use("/api/stock-movements", stockMovementRoutes);
+
+app.use("/api/purchases", purchaseRoutes);
 
 // Main API endpoint
 app.get("/api", (_req, res) => {

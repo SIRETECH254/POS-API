@@ -1,5 +1,6 @@
 import Branch from "../models/Branch";
 import Shift from "../models/Shift";
+import Purchase from "../models/Purchase";
 
 /**
  * Generate a unique branch code derived from the branch name.
@@ -77,7 +78,7 @@ export const generatePaymentNumber = async (
 /**
  * Generate a branch-prefixed purchase order number.
  * Format: {BRANCH_CODE}-PO-{YYYY}-{NNNN}
- * Stub — implemented when the Purchase module is built.
+ * Example: MAIN-PO-2026-0001
  */
 export const generatePurchaseNumber = async (
   branchCode: string | undefined,
@@ -85,6 +86,7 @@ export const generatePurchaseNumber = async (
 ): Promise<string> => {
   const code = branchCode || "BR";
   const year = new Date().getFullYear();
-  void branchId;
-  return `${code}-PO-${year}-0001`;
+  const count = await Purchase.countDocuments({ branch: branchId });
+  const sequence = String(count + 1).padStart(4, "0");
+  return `${code}-PO-${year}-${sequence}`;
 };
