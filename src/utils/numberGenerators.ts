@@ -3,6 +3,7 @@ import Shift from "../models/Shift";
 import Purchase from "../models/Purchase";
 import StockCount from "../models/StockCount";
 import Transfer from "../models/Transfer";
+import Tab from "../models/Tab";
 
 /**
  * Generate a unique branch code derived from the branch name.
@@ -50,16 +51,16 @@ export const generateShiftNumber = async (
 /**
  * Generate a branch-prefixed tab number.
  * Format: {BRANCH_CODE}-TAB-{NNNNNN}
- * Stub — implemented when the Tab module is built.
+ * Example: MAIN-TAB-000001
  */
 export const generateTabNumber = async (
   branchCode: string | undefined,
   branchId: string
 ): Promise<string> => {
   const code = branchCode || "BR";
-  // Tab model import and count will go here
-  void branchId;
-  return `${code}-TAB-000001`;
+  const count = await Tab.countDocuments({ branch: branchId });
+  const sequence = String(count + 1).padStart(6, "0");
+  return `${code}-TAB-${sequence}`;
 };
 
 /**

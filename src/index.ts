@@ -23,6 +23,7 @@ import purchaseRoutes from "./routes/purchaseRoutes";
 import stockAdjustmentRoutes from "./routes/stockAdjustmentRoutes";
 import stockCountRoutes from "./routes/stockCountRoutes";
 import transferRoutes from "./routes/transferRoutes";
+import tabRoutes from "./routes/tabRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -142,6 +143,8 @@ app.use("/api/stock-adjustments", stockAdjustmentRoutes);
 app.use("/api/stock-counts", stockCountRoutes);
 
 app.use("/api/transfers", transferRoutes);
+
+app.use("/api/tabs", tabRoutes);
 
 // Main API endpoint
 app.get("/api", (_req, res) => {

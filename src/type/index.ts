@@ -320,3 +320,53 @@ export interface ITransfer extends Document {
   createdAt: Date;
   receivedAt?: Date;
 }
+
+// Tab
+export type TabStatus =
+  | "draft"
+  | "open"
+  | "held"
+  | "awaiting_payment"
+  | "paid"
+  | "completed"
+  | "cancelled"
+  | "archived";
+
+export type TabItemStatus = "active" | "cancelled";
+
+export interface ITabItem {
+  product: Types.ObjectId | IProduct;
+  sku: Types.ObjectId;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  discount: number;
+  subtotal: number;
+  status: TabItemStatus;
+  addedBy: Types.ObjectId | IUser;
+  addedAt: Date;
+}
+
+export interface ITab extends Document {
+  tabNumber: string;
+  branch: Types.ObjectId | IBranch;
+  table?: string;
+  openedBy: Types.ObjectId | IUser;
+  shift: Types.ObjectId | IShift;
+  items: Types.DocumentArray<ITabItem & Document>;
+  mergedFrom: Types.ObjectId[];
+  splitInto: Types.ObjectId[];
+  subtotal: number;
+  discountTotal: number;
+  taxTotal: number;
+  grandTotal: number;
+  amountPaid: number;
+  balanceDue: number;
+  status: TabStatus;
+  holdReason?: string | undefined;
+  cancelReason?: string;
+  closedBy?: Types.ObjectId | IUser;
+  closedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
