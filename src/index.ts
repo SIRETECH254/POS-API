@@ -26,6 +26,7 @@ import transferRoutes from "./routes/transferRoutes";
 import tabRoutes from "./routes/tabRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import receiptRoutes from "./routes/receiptRoutes";
+import expenseRoutes from "./routes/expenseRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -151,6 +152,8 @@ app.use("/api/tabs", tabRoutes);
 app.use("/api/payments", paymentRoutes);
 
 app.use("/api/receipts", receiptRoutes);
+
+app.use("/api/expenses", expenseRoutes);
 
 // Main API endpoint
 app.get("/api", (_req, res) => {

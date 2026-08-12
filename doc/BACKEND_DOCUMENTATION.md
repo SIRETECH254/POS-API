@@ -475,7 +475,7 @@ interface ITransfer {
 
 ---
 
-### 16. Expense Model
+### 16. Expense Model *(implemented)*
 ```typescript
 interface IExpense {
   _id: ObjectId;
@@ -485,13 +485,20 @@ interface IExpense {
   amount: number;
   paymentMethod: 'cash' | 'mpesa' | 'bank';
   receiptUrl: string; // Cloudinary, optional scanned receipt
+  receiptPublicId: string; // Cloudinary
+  status: 'pending' | 'approved';
   approvedBy: ObjectId; // ref: User, manager+
+  approvedAt: Date;
   recordedBy: ObjectId; // ref: User
   expenseDate: Date;
   createdAt: Date;
+  updatedAt: Date;
 }
 ```
-**Notes:** feeds directly into Profit Reports (`Net Profit = Revenue − Cost of Goods − Expenses`), reportable per branch or consolidated across branches.
+**Notes:**
+- Feeds directly into Profit Reports (`Net Profit = Revenue − Cost of Goods − Expenses`), reportable per branch or consolidated across branches.
+- `status`/`receiptPublicId` were added beyond this original spec — a `status` lifecycle is required for `approveExpense()` to mean anything, and every Cloudinary-backed model in this codebase stores both `url` and `public_id`. See `doc/modules/EXPENSE_DOCUMENTATION.md` for the full rationale.
+- Approved expenses are immutable — `updateExpense()`/`deleteExpense()` both reject once `status === "approved"`.
 
 ---
 
@@ -911,13 +918,14 @@ interface ITransfer {
 
 > **Implementation note:** this bundled controller was not built as-is. It was implemented as **four separate modules** instead, matching the rest of this codebase's one-model-per-file convention: `getStockMovements()` lives in its own `StockMovement` module (`stockMovementController.ts`, see `doc/modules/STOCKMOVEMENT_DOCUMENTATION.md`), and the remaining functions were split into `stockAdjustmentController.ts`, `stockCountController.ts`, and `transferController.ts` — see `doc/modules/inventory/`.
 
-### 15. Expense Controller — `expenseController.ts`
+### 15. Expense Controller — `expenseController.ts` *(implemented)*
 - `createExpense()`
 - `getAllExpenses()`
 - `getExpense()`
-- `updateExpense()`
-- `deleteExpense()`
-- `approveExpense()`
+- `updateExpense()` — blocked once `status === "approved"`
+- `deleteExpense()` — admin only, blocked once `status === "approved"`
+- `approveExpense()` — manager/admin, only from `status: "pending"`
+> See `doc/modules/EXPENSE_DOCUMENTATION.md`.
 
 ### 16. Shift Controller — `shiftController.ts`
 - `startShift()` — records opening float, at the staff member's branch
@@ -1191,16 +1199,17 @@ PATCH  /transfers/:id/receive
 ```
 > **Implementation note:** not built as a single bundled `/api/inventory` router. `/movements` already exists as its own `/api/stock-movements` router; adjustments/stock-counts/transfers were implemented as their own routers at `/api/stock-adjustments`, `/api/stock-counts`, `/api/transfers` — see the `*(implemented)*` route sections below.
 
-### Expense Routes
+### Expense Routes *(implemented)*
 **Base:** `/api/expenses`
 ```
-POST   /
-GET    /
-GET    /:expenseId
-PUT    /:expenseId
-DELETE /:expenseId
-PATCH  /:expenseId/approve            // manager/admin
+POST   /                    // store_keeper, manager, admin
+GET    /                    // store_keeper, manager, admin, accountant
+GET    /:expenseId          // store_keeper, manager, admin, accountant
+PUT    /:expenseId          // store_keeper, manager, admin
+DELETE /:expenseId          // admin only
+PATCH  /:expenseId/approve  // manager, admin
 ```
+> See `doc/modules/EXPENSE_DOCUMENTATION.md`.
 
 ### Shift Routes
 **Base:** `/api/shifts`

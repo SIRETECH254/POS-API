@@ -421,3 +421,35 @@ export interface IReceipt extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Expense
+export type ExpenseCategory =
+  | "rent"
+  | "electricity"
+  | "water"
+  | "dj"
+  | "security"
+  | "cleaning"
+  | "fuel"
+  | "repairs"
+  | "marketing"
+  | "other";
+export type ExpensePaymentMethod = "cash" | "mpesa" | "bank";
+export type ExpenseStatus = "pending" | "approved";
+
+export interface IExpense extends Document {
+  branch: Types.ObjectId | IBranch;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  paymentMethod: ExpensePaymentMethod;
+  receiptUrl?: string;
+  receiptPublicId?: string;
+  status: ExpenseStatus;
+  approvedBy?: Types.ObjectId | IUser;
+  approvedAt?: Date;
+  recordedBy: Types.ObjectId | IUser;
+  expenseDate: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
