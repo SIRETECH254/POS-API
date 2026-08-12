@@ -59,18 +59,22 @@ export const uploadExpenseReceipt = multer({
 
 export const uploadToCloudinary = async (
   file: any,
-  folder: string = "pos-api/general"
+  folder: string = "pos-api/general",
+  resourceType: "auto" | "raw" = "auto"
 ): Promise<{ url: string; public_id: string; format: string; size: number }> => {
   try {
-    const uploadOptions = {
-      folder,
-      resource_type: "auto" as const,
-      transformation: [
-        { width: 1000, height: 1000, crop: "limit" },
-        { quality: "auto" },
-        { fetch_format: "auto" },
-      ],
-    };
+    const uploadOptions =
+      resourceType === "raw"
+        ? { folder, resource_type: "raw" as const }
+        : {
+            folder,
+            resource_type: "auto" as const,
+            transformation: [
+              { width: 1000, height: 1000, crop: "limit" },
+              { quality: "auto" },
+              { fetch_format: "auto" },
+            ],
+          };
 
     let result;
     if (file.path) {

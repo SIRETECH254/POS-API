@@ -4,6 +4,8 @@ import Purchase from "../models/Purchase";
 import StockCount from "../models/StockCount";
 import Transfer from "../models/Transfer";
 import Tab from "../models/Tab";
+import Payment from "../models/Payment";
+import Receipt from "../models/Receipt";
 
 /**
  * Generate a unique branch code derived from the branch name.
@@ -66,7 +68,7 @@ export const generateTabNumber = async (
 /**
  * Generate a branch-prefixed payment number.
  * Format: {BRANCH_CODE}-PAY-{YYYY}-{NNNN}
- * Stub — implemented when the Payment module is built.
+ * Example: MAIN-PAY-2026-0001
  */
 export const generatePaymentNumber = async (
   branchCode: string | undefined,
@@ -74,8 +76,25 @@ export const generatePaymentNumber = async (
 ): Promise<string> => {
   const code = branchCode || "BR";
   const year = new Date().getFullYear();
-  void branchId;
-  return `${code}-PAY-${year}-0001`;
+  const count = await Payment.countDocuments({ branch: branchId });
+  const sequence = String(count + 1).padStart(4, "0");
+  return `${code}-PAY-${year}-${sequence}`;
+};
+
+/**
+ * Generate a branch-prefixed receipt number.
+ * Format: {BRANCH_CODE}-RCT-{YYYY}-{NNNN}
+ * Example: MAIN-RCT-2026-0001
+ */
+export const generateReceiptNumber = async (
+  branchCode: string | undefined,
+  branchId: string
+): Promise<string> => {
+  const code = branchCode || "BR";
+  const year = new Date().getFullYear();
+  const count = await Receipt.countDocuments({ branch: branchId });
+  const sequence = String(count + 1).padStart(4, "0");
+  return `${code}-RCT-${year}-${sequence}`;
 };
 
 /**

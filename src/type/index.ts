@@ -370,3 +370,54 @@ export interface ITab extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Payment
+export type PaymentMethod = "cash" | "mpesa";
+export type PaymentStatus = "pending" | "completed" | "failed" | "reversed";
+
+export interface IPaymentMpesaDetails {
+  phone?: string;
+  checkoutRequestId?: string;
+  merchantRequestId?: string;
+  mpesaReceiptNumber?: string;
+  resultCode?: number;
+  resultDesc?: string;
+}
+
+export interface IPayment extends Document {
+  paymentNumber: string;
+  tab: Types.ObjectId | ITab;
+  branch: Types.ObjectId | IBranch;
+  shift: Types.ObjectId | IShift;
+  method: PaymentMethod;
+  amount: number;
+  status: PaymentStatus;
+  cashReceived?: number;
+  cashChange?: number;
+  mpesa?: IPaymentMpesaDetails;
+  reversedBy?: Types.ObjectId | IUser;
+  reversedReason?: string;
+  processedBy: Types.ObjectId | IUser;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Receipt
+export type ReceiptType = "sale" | "refund" | "reprint";
+
+export interface IReceipt extends Document {
+  receiptNumber: string;
+  branch: Types.ObjectId | IBranch;
+  tab: Types.ObjectId | ITab;
+  payment?: Types.ObjectId | IPayment;
+  type: ReceiptType;
+  amount: number;
+  pdfUrl: string;
+  pdfPublicId: string;
+  generatedBy: Types.ObjectId | IUser;
+  printedAt?: Date;
+  printedBy?: Types.ObjectId | IUser;
+  refundReason?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}

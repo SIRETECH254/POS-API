@@ -331,7 +331,7 @@ interface ITab {
 
 ---
 
-### 10. Payment Model
+### 10. Payment Model *(implemented)*
 ```typescript
 interface IPayment {
   _id: ObjectId;
@@ -339,7 +339,7 @@ interface IPayment {
   tab: ObjectId; // ref: Tab
   branch: ObjectId; // ref: Branch
   shift: ObjectId; // ref: Shift
-  method: 'cash' | 'mpesa' | 'card';
+  method: 'cash' | 'mpesa';
   amount: number;
   status: 'pending' | 'completed' | 'failed' | 'reversed';
   cashReceived: number; // cash method only
@@ -352,11 +352,6 @@ interface IPayment {
     resultCode: number;
     resultDesc: string;
   };
-  card: {
-    terminalRef: string;
-    last4: string;
-    authCode: string;
-  };
   reversedBy: ObjectId; // ref: User, manager only
   reversedReason: string;
   processedBy: ObjectId; // ref: User
@@ -365,9 +360,10 @@ interface IPayment {
 }
 ```
 **Notes:**
-- A single Tab can have **multiple Payment records** (Mixed Payment) — e.g. one `cash` + one `mpesa` record summing to the grand total.
-- M-Pesa payments are created as `pending` on STK push, then flipped to `completed`/`failed` by the Daraja callback.
-- Reversal is restricted to `manager`/`administrator` roles for that branch and is logged to Audit Logs.
+- A single Tab can have **multiple Payment records** (Mixed Payment) — e.g. one `cash` + one `mpesa` record summing to the grand total. This needs no dedicated endpoint: call `POST /cash` then `POST /mpesa/initiate` (or vice versa) against the same tab.
+- M-Pesa payments are created as `pending` on STK push, then flipped to `completed`/`failed` by the Daraja callback (`POST /api/payments/mpesa/callback`).
+- Reversal is restricted to `manager`/`admin` roles, and is additionally blocked once the payment's tab is `completed` or its shift is `closed` — see `doc/modules/PAYMENT_DOCUMENTATION.md` for the full rationale. No `AuditLog` model exists yet, so reversal is not separately logged there.
+- **Card/Paystack support is deferred.** `method` and the model no longer include `card` — only `cash`/`mpesa` are implemented for this pass.
 
 ---
 
@@ -573,20 +569,31 @@ interface INotification {
 
 ---
 
-### 20. Receipt Model
+### 20. Receipt Model *(implemented)*
 ```typescript
 interface IReceipt {
   _id: ObjectId;
+  receiptNumber: string; // auto-generated, branch-prefixed, RCT-YYYY-0001
   branch: ObjectId; // ref: Branch
   tab: ObjectId; // ref: Tab
-  receiptNumber: string;
+  payment: ObjectId; // ref: Payment, sale receipts only
   type: 'sale' | 'refund' | 'reprint';
-  pdfUrl: string; // Cloudinary
+  amount: number;
+  pdfUrl: string; // Cloudinary, resource_type 'raw'
+  pdfPublicId: string; // Cloudinary
+  generatedBy: ObjectId; // ref: User
   printedAt: Date;
   printedBy: ObjectId; // ref: User
+  refundReason: string; // refund receipts only
   createdAt: Date;
+  updatedAt: Date;
 }
 ```
+**Notes:**
+- Generated automatically: `paymentService.applySuccessfulPayment()` calls `receiptService.generateReceipt()` (`type: 'sale'`) right after `tabService.completeTab()`, once a tab's balance hits zero.
+- Refund receipts are manual only — `POST /api/receipts/tab/:tabId/refund`, not tied to `paymentService.reversePayment()`.
+- Reprints don't re-render — they copy the original sale receipt's `pdfUrl`/`pdfPublicId`/`amount` into a new record.
+- `emailReceipt()` is not implemented in this pass — see `doc/modules/RECEIPT_DOCUMENTATION.md` for the full rationale and API contract.
 
 ---
 
@@ -864,16 +871,17 @@ interface ITransfer {
 - `getTab()`
 - `getTabHistory()`
 
-### 11. Payment Controller — `paymentController.ts`
-- `payCash()` — receive amount, calculate change, open cash drawer signal
-- `initiateMpesaPayment()` — STK Push
-- `mpesaCallback()` — Daraja webhook, confirms/fails payment, auto-completes Tab when `amountPaid >= grandTotal`
-- `retryMpesaPayment()`
-- `reverseMpesaPayment()` — manager only
-- `payCard()` — terminal integration or manual entry
-- `recordMixedPayment()` — multiple payment lines against one tab
+### 11. Payment Controller — `paymentController.ts` *(implemented)*
+- `payCash()` — receive amount, calculate change, apply immediately (no pending state)
+- `initiateMpesaPayment()` — STK Push, creates a pending payment
+- `mpesaCallback()` — Daraja webhook, confirms/fails payment, auto-completes Tab when `amountPaid >= grandTotal`; always acks Safaricom with `200` regardless of internal outcome
+- `retryMpesaPayment()` — creates a new payment for a failed one; original is left as history (no `AuditLog` exists yet)
+- `reversePayment()` — manager/admin only; generalized to reverse cash or mpesa payments, not mpesa-specific as originally named
 - `getPayment()`
 - `getTabPayments()`
+- `getMpesaPaymentStatus()` — manual reconciliation against Daraja by `checkoutRequestId`; idempotent no-op once resolved
+
+> **Implementation note:** `payCard()` and `recordMixedPayment()` were not built — card/Paystack support is deferred, and mixed payment needs no dedicated endpoint (see Payment Model notes above).
 
 ### 12. Supplier Controller — `supplierController.ts`
 - `createSupplier()`
@@ -938,12 +946,13 @@ interface ITransfer {
 - `getInventoryValueTrend()`
 - `getBranchComparison()` — side-by-side branch performance, admin only
 
-### 19. Receipt Controller — `receiptController.ts`
-- `generateReceipt()`
+### 19. Receipt Controller — `receiptController.ts` *(implemented)*
+- `getTabReceipts()`
+- `getReceipt()`
 - `printReceipt()`
 - `reprintReceipt()`
 - `generateRefundReceipt()`
-- `emailReceipt()` — digital receipt, future
+> **Implementation note:** receipt generation itself (`generateReceipt()`) is not a controller action — it has no route. It lives in `services/internal/receiptService.ts` and is called automatically by `paymentService.applySuccessfulPayment()`. `emailReceipt()` was not implemented in this pass. See `doc/modules/RECEIPT_DOCUMENTATION.md`.
 
 ### 20. Notification Controller — `notificationController.ts`
 - `getMyNotifications()`
@@ -1132,20 +1141,19 @@ PATCH  /:tabId/close                // -> awaiting_payment
 GET    /                           // history, filterable, scoped to branch
 ```
 
-### Payment Routes
+### Payment Routes *(implemented)*
 **Base:** `/api/payments`
 ```
-POST   /cash                       // { tabId, amountReceived }
-POST   /card                       // { tabId, amount, terminalRef? }
-POST   /mixed                      // { tabId, lines: [{method, amount}] }
-POST   /mpesa/initiate              // { tabId, phone, amount } -> STK push
-POST   /mpesa/callback              // Daraja webhook, public
-POST   /mpesa/:paymentId/retry
-PATCH  /:paymentId/reverse          // manager only
+POST   /cash                            // { tabId, amount?, cashReceived } — bartender/cashier/manager/admin
+POST   /mpesa/initiate                  // { tabId, phone, amount? } -> STK push — bartender/cashier/manager/admin
+POST   /mpesa/callback                  // Daraja webhook, public — /api/payments/mpesa/callback
+POST   /mpesa/:paymentId/retry          // bartender/cashier/manager/admin
+PATCH  /:paymentId/reverse              // { reversedReason } — manager/admin only
 GET    /tab/:tabId
-GET    /:paymentId
 GET    /mpesa-status/:checkoutRequestId
+GET    /:paymentId
 ```
+`POST /card` and `POST /mixed` were not built — see Payment Controller notes above.
 
 ### Supplier Routes
 **Base:** `/api/suppliers`
@@ -1229,15 +1237,16 @@ GET    /inventory-value
 GET    /branch-comparison             // admin only
 ```
 
-### Receipt Routes
+### Receipt Routes *(implemented)*
 **Base:** `/api/receipts`
 ```
-GET    /tab/:tabId
-POST   /tab/:tabId/print
-POST   /tab/:tabId/reprint
-POST   /tab/:tabId/refund
-POST   /tab/:tabId/email
+GET    /tab/:tabId                    // bartender, cashier, manager, admin, accountant
+POST   /tab/:tabId/print              // bartender, cashier, manager, admin
+POST   /tab/:tabId/reprint            // bartender, cashier, manager, admin
+POST   /tab/:tabId/refund             // manager, admin
+GET    /:receiptId                    // bartender, cashier, manager, admin, accountant
 ```
+> **Implementation note:** no `/email` route — `emailReceipt()` was not implemented in this pass. See `doc/modules/RECEIPT_DOCUMENTATION.md`.
 
 ### Notification Routes
 **Base:** `/api/notifications`
