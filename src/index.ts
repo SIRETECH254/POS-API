@@ -27,6 +27,8 @@ import tabRoutes from "./routes/tabRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import receiptRoutes from "./routes/receiptRoutes";
 import expenseRoutes from "./routes/expenseRoutes";
+import reportRoutes from "./routes/reportRoutes";
+import analyticsRoutes from "./routes/analyticsRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -154,6 +156,10 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/receipts", receiptRoutes);
 
 app.use("/api/expenses", expenseRoutes);
+
+app.use("/api/reports", reportRoutes);
+
+app.use("/api/analytics", analyticsRoutes);
 
 // Main API endpoint
 app.get("/api", (_req, res) => {

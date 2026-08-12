@@ -935,7 +935,7 @@ interface ITransfer {
 - `getShift()`
 - `reviewVariance()` — manager investigates and closes out a variance
 
-### 17. Report Controller — `reportController.ts`
+### 17. Report Controller — `reportController.ts` *(implemented)*
 - `getSalesReport(range)`
 - `getProductReport()` — best sellers / slow movers / never sold
 - `getPaymentReport()`
@@ -943,9 +943,10 @@ interface ITransfer {
 - `getProfitReport()`
 - `getEmployeeReport()` — sales per bartender, cancelled tabs, discounts, shift reports
 - `getSupplierReport()`
-- All accept an optional `branch` filter; admins can request a consolidated multi-branch view
+- All accept an optional `branch` filter; any Report-authorized role can request a consolidated multi-branch view by omitting it
+> No dedicated model — pure read-only aggregation over Tab/Payment/Purchase/Expense/Product/Shift. Heavy aggregations shared with Analytics via `services/internal/reportingService.ts`. See `doc/modules/REPORT_DOCUMENTATION.md`.
 
-### 18. Analytics Controller — `analyticsController.ts`
+### 18. Analytics Controller — `analyticsController.ts` *(implemented)*
 - `getSalesTrend()`
 - `getProfitTrend()`
 - `getPeakHours()`
@@ -953,6 +954,7 @@ interface ITransfer {
 - `getPaymentDistribution()`
 - `getInventoryValueTrend()`
 - `getBranchComparison()` — side-by-side branch performance, admin only
+> No dedicated model — same reasoning as Report. Trend endpoints are rolling-window (`days`/`from`/`to`), zero-filled by day. See `doc/modules/ANALYTICS_DOCUMENTATION.md`.
 
 ### 19. Receipt Controller — `receiptController.ts` *(implemented)*
 - `getTabReceipts()`
@@ -1222,29 +1224,31 @@ GET    /:shiftId
 PATCH  /:shiftId/review-variance         // manager
 ```
 
-### Report Routes
+### Report Routes *(implemented)*
 **Base:** `/api/reports`
 ```
 GET    /sales?range=today|yesterday|weekly|monthly|yearly&branch=:branchId
-GET    /products                        // best-sellers, slow movers, never sold
-GET    /payments
-GET    /inventory
-GET    /profit
-GET    /employees
-GET    /suppliers
+GET    /products?range=&branch=&limit=  // best-sellers, slow movers, never sold
+GET    /payments?range=&branch=
+GET    /inventory?branch=
+GET    /profit?range=&branch=
+GET    /employees?range=&branch=
+GET    /suppliers?range=&branch=
 ```
+All routes: `manager`, `admin`, `accountant`. See `doc/modules/REPORT_DOCUMENTATION.md`.
 
-### Analytics Routes
+### Analytics Routes *(implemented)*
 **Base:** `/api/analytics`
 ```
-GET    /sales-trend
-GET    /profit-trend
-GET    /peak-hours
-GET    /top-products
-GET    /payment-distribution
-GET    /inventory-value
-GET    /branch-comparison             // admin only
+GET    /sales-trend?days=|from=&to=&branch=
+GET    /profit-trend?days=|from=&to=&branch=
+GET    /peak-hours?range=&branch=
+GET    /top-products?range=&branch=&limit=
+GET    /payment-distribution?range=&branch=
+GET    /inventory-value?days=|from=&to=&branch=
+GET    /branch-comparison?range=             // admin only
 ```
+See `doc/modules/ANALYTICS_DOCUMENTATION.md`.
 
 ### Receipt Routes *(implemented)*
 **Base:** `/api/receipts`
