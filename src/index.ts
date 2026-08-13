@@ -33,6 +33,7 @@ import reportRoutes from "./routes/reportRoutes";
 import analyticsRoutes from "./routes/analyticsRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import auditRoutes from "./routes/auditRoutes";
+import settingsRoutes from "./routes/settingsRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -168,6 +169,8 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/notifications", notificationRoutes);
 
 app.use("/api/audit-logs", auditRoutes);
+
+app.use("/api/settings", settingsRoutes);
 
 // Main API endpoint
 app.get("/api", (_req, res) => {

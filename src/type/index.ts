@@ -495,3 +495,29 @@ export interface IAuditLog extends Document {
   ipAddress?: string;
   createdAt: Date;
 }
+
+// Settings
+export type PrinterType = "usb" | "network";
+export type SettingsPaymentMethod = "cash" | "mpesa" | "card";
+
+export interface IPrinterConfig {
+  type: PrinterType;
+  target: string;
+}
+
+export interface ISettings extends Document {
+  branch: Types.ObjectId | IBranch;
+  businessName: string;
+  address: string;
+  phone: string;
+  taxRate: number;
+  currency: string;
+  receiptFooterNote: string;
+  paymentMethodsEnabled: SettingsPaymentMethod[];
+  printerConfig: IPrinterConfig;
+  lowStockThresholdDefault: number;
+  theme?: Record<string, any>;
+  updatedBy?: Types.ObjectId | IUser;
+  createdAt: Date;
+  updatedAt: Date;
+}

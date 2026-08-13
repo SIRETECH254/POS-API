@@ -611,26 +611,29 @@ interface IReceipt {
 
 ---
 
-### 21. Settings Model (one document per branch)
+### 21. Settings Model (one document per branch) *(implemented)*
 ```typescript
 interface ISettings {
   _id: ObjectId;
-  branch: ObjectId; // ref: Branch — settings are per-branch (printer, receipt layout, tax may differ by location)
+  branch: ObjectId; // ref: Branch, unique — settings are per-branch (printer, receipt layout, tax may differ by location)
   businessName: string; // can be shared/overridden per branch
   address: string;
   phone: string;
-  taxRate: number; // percentage, applied at Tab close
+  taxRate: number; // percentage — NOT YET wired into Tab totals, see Notes
   currency: string; // default 'KES'
-  receiptFooterNote: string;
+  receiptFooterNote: string; // NOT YET wired into receipt PDFs, see Notes
   paymentMethodsEnabled: Array<'cash' | 'mpesa' | 'card'>;
   printerConfig: { type: 'usb' | 'network'; target: string };
   lowStockThresholdDefault: number;
   theme: Record<string, any>;
   updatedBy: ObjectId;
+  createdAt: Date;
   updatedAt: Date;
 }
 ```
-**Notes:** each `Branch` gets its own `Settings` document created at branch setup time, so a second location can run a different tax rate, printer, or receipt footer without touching the first.
+**Notes:**
+- **Get-or-create, not a setup-time hook.** Rather than creating a Settings document when a `Branch` is created (which would couple `branchController` to this module), `getSettings()` creates one lazily on first access, with defaults copied from the `Branch` doc. Retroactively covers branches that existed before this module did.
+- **`taxRate`/`receiptFooterNote` are stored and API-editable but intentionally not wired into `Tab`/`Receipt` yet.** `Tab.taxTotal` remains dead (always `0`, nothing sets it) and `generateReceiptPDF.ts` keeps its hardcoded footer string — both integrations were explicitly deferred as separate follow-up work rather than changing two already-working modules' behavior as a side effect of building Settings. See `doc/modules/SETTINGS_DOCUMENTATION.md`.
 
 ---
 
@@ -983,11 +986,12 @@ interface ITransfer {
 - `getEntityHistory(entityType, entityId)`
 > No `createAuditLog`/`updateAuditLog`/`deleteAuditLog` — entries are written by `auditService.logAudit()`, called explicitly from the four sensitive operations themselves. See `doc/modules/AUDIT_DOCUMENTATION.md`.
 
-### 22. Settings Controller — `settingsController.ts`
-- `getSettings(branchId)`
-- `updateSettings(branchId)`
-- `updatePrinterConfig()`
-- `updateReceiptLayout()`
+### 22. Settings Controller — `settingsController.ts` *(implemented)*
+- `getSettings(branchId)` — get-or-create
+- `updateSettings(branchId)` — manager, admin
+- `updatePrinterConfig(branchId)` — manager, admin
+- `updateReceiptLayout(branchId)` — manager, admin
+> See `doc/modules/SETTINGS_DOCUMENTATION.md`.
 
 ### 23. Location Controller — `locationController.ts` *(implemented)*
 - `searchLocation()` — proxy Google Maps Text Search (public)
@@ -1286,12 +1290,15 @@ GET    /entity/:entityType/:entityId  // manager/admin
 ```
 No `POST`/`PUT`/`DELETE` — immutable by omission, not by guard. See `doc/modules/AUDIT_DOCUMENTATION.md`.
 
-### Settings Routes
+### Settings Routes *(implemented)*
 **Base:** `/api/settings`
 ```
-GET    /:branchId
-PUT    /:branchId                      // admin/manager
+GET    /:branchId                      // any authenticated role; creates on first access
+PUT    /:branchId                      // manager, admin
+PATCH  /:branchId/printer              // manager, admin
+PATCH  /:branchId/receipt-layout       // manager, admin
 ```
+Two routes beyond the original spec (`printer`, `receipt-layout`) added to match the four documented controller functions. See `doc/modules/SETTINGS_DOCUMENTATION.md`.
 
 ### Location Routes *(implemented)*
 **Base:** `/api/locations`
@@ -1686,7 +1693,7 @@ FIREBASE_DATABASE_URL=
 cd club-pos-api
 npm install
 npm run seed:roles      # seeds the 6 default roles
-npm run seed:branch     # creates the first (main) branch + its Settings document
+npm run seed:branch     # creates the first (main) branch — its Settings document is created lazily on first GET /api/settings/:branchId, not by this script
 mongod                  # ensure MongoDB is running
 npm run dev              # tsx watch src/index.ts (or nodemon + tsx)
 ```
