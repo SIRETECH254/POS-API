@@ -556,14 +556,15 @@ interface IAuditLog {
 
 ---
 
-### 19. Notification Model
+### 19. Notification Model *(implemented)*
 ```typescript
 interface INotification {
   _id: ObjectId;
-  branch: ObjectId; // ref: Branch, for branch-broadcast notifications
-  recipient: ObjectId; // ref: User, or null for role/branch broadcast
-  recipientRole: string; // alternative: broadcast to a role within a branch, e.g. 'manager'
-  type: 'low_stock' | 'shift_started' | 'shift_closed' | 'mpesa_failed' | 'payment_success' | 'daily_summary';
+  branch: ObjectId; // ref: Branch
+  recipient: ObjectId; // ref: User — always concrete, never null (see Notes)
+  recipientRole: string; // set when created via a role fan-out; records which role matched, e.g. 'manager'
+  type: 'low_stock' | 'shift_started' | 'shift_closed' | 'mpesa_failed' | 'payment_success' | 'daily_summary'
+      | 'expense_pending_approval' | 'purchase_received' | 'transfer_received' | 'tab_cancelled';
   title: string;
   message: string;
   metadata: Record<string, any>;
@@ -572,7 +573,11 @@ interface INotification {
   createdAt: Date;
 }
 ```
-**Notes:** delivered in-app via Socket.io in real time (to a `branch:<branchId>` room), and mirrored here for the notification bell / history.
+**Notes:**
+- `recipient` is always a concrete user — `isRead`/`readAt` are scalar fields that only mean something for a single owner. A role/branch "broadcast" fans out into one document per matching user at creation time instead of a single nullable-recipient row.
+- Four `type` values were added beyond the original six, to cover the trigger points wired this pass. `shift_started` remains in the enum but isn't actively triggered.
+- Delivered in-app via Socket.io in real time to the recipient's own `user_<id>` room (see the corrected Real-time Events section below), and persisted here for the notification bell / history.
+- See `doc/modules/NOTIFICATION_DOCUMENTATION.md` for the full trigger-wiring table (8 call sites across 6 other modules) and the daily-summary cron job.
 
 ---
 
@@ -964,13 +969,12 @@ interface ITransfer {
 - `generateRefundReceipt()`
 > **Implementation note:** receipt generation itself (`generateReceipt()`) is not a controller action — it has no route. It lives in `services/internal/receiptService.ts` and is called automatically by `paymentService.applySuccessfulPayment()`. `emailReceipt()` was not implemented in this pass. See `doc/modules/RECEIPT_DOCUMENTATION.md`.
 
-### 20. Notification Controller — `notificationController.ts`
+### 20. Notification Controller — `notificationController.ts` *(implemented)*
 - `getMyNotifications()`
 - `getUnreadCount()`
 - `markAsRead()`
 - `markAllAsRead()`
-- `sendLowStockAlert()` — cron-triggered, per branch
-- `sendDailySummary()` — cron-triggered, per branch
+> **Implementation note:** `sendLowStockAlert()` and `sendDailySummary()` are not controller actions — they have no route. Both live in `services/internal/notificationService.ts`: `sendLowStockAlert()` fires event-driven (inline in `stockMovementService.recordStockMovement`, the moment stock crosses the threshold — not a per-branch scan), and `sendDailySummary()` is genuinely cron-triggered via `node-cron`, registered once from `src/index.ts`. See `doc/modules/NOTIFICATION_DOCUMENTATION.md`.
 
 ### 21. Audit Controller — `auditController.ts`
 - `getAuditLogs()` — filterable by branch/user/entity/date, admin & manager only
@@ -1261,14 +1265,15 @@ GET    /:receiptId                    // bartender, cashier, manager, admin, acc
 ```
 > **Implementation note:** no `/email` route — `emailReceipt()` was not implemented in this pass. See `doc/modules/RECEIPT_DOCUMENTATION.md`.
 
-### Notification Routes
+### Notification Routes *(implemented)*
 **Base:** `/api/notifications`
 ```
-GET    /
+GET    /                     // my notifications, paginated
 GET    /unread-count
 PATCH  /:notificationId/read
 PATCH  /read-all
 ```
+No `authorizeRoles` on any route — every authenticated user manages only their own inbox, scoped by `req.user._id`. See `doc/modules/NOTIFICATION_DOCUMENTATION.md`.
 
 ### Audit Routes
 **Base:** `/api/audit-logs`
@@ -1491,10 +1496,10 @@ club-pos-api/
 - **Product images:** 2MB limit
 - **Expense receipts:** 5MB limit, images + PDF
 
-#### Real-time (Socket.io)
-- Initialized in `src/index.ts` via `config/socket.ts`
-- Rooms: `branch:<branchId>`, `shift:<shiftId>`, `branch:<branchId>:role:manager`, `branch:<branchId>:role:bartender`
-- Used for open-tab live updates, low-stock pushes, M-Pesa payment confirmation, and the live Manager Dashboard — all scoped per branch so one location's bartender never sees another's tabs
+#### Real-time (Socket.io) *(corrected — see below)*
+- Server initialized directly in `src/index.ts` (not a separate `config/socket.ts` — that path was aspirational and never existed until the Notification module added a small, differently-scoped `config/socket.ts` purely for a `setIo`/`getIo` accessor, described in `doc/modules/NOTIFICATION_DOCUMENTATION.md`)
+- **Rooms are per-user, not per-branch/role:** `userId → socket.id` tracked in a `Map`, client joins `user_<userId>` on an `authenticate` event. There is no `branch:<branchId>` or `:role:` room anywhere in the actual implementation.
+- As of this pass, `notification:new` (Notification module) is the **only** event any controller or service emits. The tab/shift/payment live-update events originally sketched below were never built by any module — see the corrected table.
 
 ---
 
@@ -1531,17 +1536,19 @@ draft → open → (items added) → awaiting_payment
 
 ---
 
-## 📡 Real-time Events (Socket.io)
+## 📡 Real-time Events (Socket.io) *(corrected to match the actual implementation)*
 
-| Event | Emitted to | Trigger |
-|---|---|---|
-| `tab:opened` / `tab:updated` / `tab:closed` | `branch:<branchId>:role:bartender`, `branch:<branchId>:role:manager` | Any Tab mutation |
-| `payment:mpesa:pending` | `shift:<shiftId>` | STK Push sent |
-| `payment:mpesa:confirmed` / `payment:mpesa:failed` | `shift:<shiftId>` | Daraja callback received |
-| `stock:low` | `branch:<branchId>:role:manager`, `branch:<branchId>:role:store_keeper` | SKU crosses `minimumStock` for that branch |
-| `shift:started` / `shift:ended` | `branch:<branchId>:role:manager` | Shift open/close |
-| `shift:variance:flagged` | `branch:<branchId>:role:manager` | \|variance\| exceeds threshold on shift close |
-| `notification:new` | specific user or branch/role room | Any Notification created |
+Only per-user `user_<userId>` rooms exist (see `src/index.ts`, `authenticate` event) — there is no `branch:<branchId>` or `:role:` room anywhere in this codebase. Prior drafts of this doc described a richer branch/role-scoped event set (tab live updates, payment pushes, shift/stock events broadcast per role); **none of it was ever built** — confirmed zero `io.to(`/`.emit(` calls anywhere before the Notification module.
+
+| Event | Emitted to | Trigger | Status |
+|---|---|---|---|
+| `notification:new` | the recipient's own `user_<userId>` room | Any `Notification` document created (see the 8 trigger points in `doc/modules/NOTIFICATION_DOCUMENTATION.md`) | *(implemented)* |
+| `tab:opened` / `tab:updated` / `tab:closed` | — | Any Tab mutation | not implemented |
+| `payment:mpesa:pending` / `payment:mpesa:confirmed` / `payment:mpesa:failed` | — | STK push sent / Daraja callback | not implemented (the `mpesa_failed`/`payment_success` *Notification* events cover the confirm/fail cases per-recipient instead — see Notification doc) |
+| `stock:low` | — | SKU crosses `minimumStock` | not implemented (the `low_stock` *Notification* event covers this instead) |
+| `shift:started` / `shift:ended` / `shift:variance:flagged` | — | Shift open/close | not implemented (the `shift_closed` *Notification* event covers the close+variance case instead) |
+
+In short: rather than a second, broader real-time event bus, low-stock/shift-close/payment-outcome pushes were folded into the Notification module's single `notification:new` event, addressed to individual recipients.
 
 ---
 

@@ -7,6 +7,7 @@ import Shift from "../models/Shift";
 import { IRole } from "../type";
 import { generateTabNumber } from "../utils/numberGenerators";
 import { mergeTabs as mergeTabsService, splitBill as splitBillService } from "../services/internal/tabService";
+import { createNotification } from "../services/internal/notificationService";
 
 /**
  * Resolves the branch a list endpoint should be scoped to.
@@ -549,6 +550,16 @@ export const cancelTab = async (req: Request, res: Response, next: NextFunction)
     // Increment shift tabsCancelled counter
     await Shift.findByIdAndUpdate(tab.shift, {
       $inc: { "salesSummary.tabsCancelled": 1 },
+    });
+
+    // Notify managers of the branch
+    await createNotification({
+      branch: tab.branch as any,
+      recipientRole: "manager",
+      type: "tab_cancelled",
+      title: "Tab cancelled",
+      message: `Tab ${tab.tabNumber} was cancelled: ${cancelReason}`,
+      metadata: { tabId: tab._id, cancelReason },
     });
 
     // Return updated tab

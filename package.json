@@ -17,6 +17,7 @@
   "dependencies": {
     "@googlemaps/google-maps-services-js": "^3.4.2",
     "@sendgrid/mail": "^8.1.6",
+    "@types/node-cron": "^3.0.11",
     "@types/pdfkit": "^0.17.6",
     "africastalking": "^0.7.9",
     "axios": "^1.19.0",
@@ -30,6 +31,7 @@
     "mongoose": "^8.24.1",
     "multer": "^2.2.0",
     "multer-storage-cloudinary": "^4.0.0",
+    "node-cron": "^4.6.0",
     "pdfkit": "^0.19.1",
     "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.3.0",

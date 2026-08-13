@@ -5,6 +5,7 @@ import Branch from "../models/Branch";
 import Product from "../models/Product";
 import { generateTransferNumber } from "../utils/numberGenerators";
 import { recordStockMovement } from "../services/internal/stockMovementService";
+import { createNotification } from "../services/internal/notificationService";
 
 /**
  * Create transfer
@@ -191,6 +192,16 @@ export const receiveTransfer = async (req: Request, res: Response, next: NextFun
     transfer.receivedBy = req.user?._id as any;
     transfer.receivedAt = new Date();
     await transfer.save();
+
+    // Notify managers at the receiving branch
+    await createNotification({
+      branch: transfer.toBranch as any,
+      recipientRole: "manager",
+      type: "transfer_received",
+      title: "Stock transfer received",
+      message: `Transfer ${transfer.transferNumber} has arrived and been added to stock.`,
+      metadata: { transferId: transfer._id, fromBranch: transfer.fromBranch },
+    });
 
     // Return updated transfer
     res.status(200).json({

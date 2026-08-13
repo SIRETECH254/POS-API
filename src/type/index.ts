@@ -453,3 +453,29 @@ export interface IExpense extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Notification
+export type NotificationType =
+  | "low_stock"
+  | "shift_started"
+  | "shift_closed"
+  | "mpesa_failed"
+  | "payment_success"
+  | "daily_summary"
+  | "expense_pending_approval"
+  | "purchase_received"
+  | "transfer_received"
+  | "tab_cancelled";
+
+export interface INotification extends Document {
+  branch: Types.ObjectId | IBranch;
+  recipient: Types.ObjectId | IUser;
+  recipientRole?: UserRole;
+  type: NotificationType;
+  title: string;
+  message: string;
+  metadata?: Record<string, any>;
+  isRead: boolean;
+  readAt?: Date;
+  createdAt: Date;
+}

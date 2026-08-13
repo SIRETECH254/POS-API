@@ -6,6 +6,8 @@ import path from "path";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import swaggerConfig from "./config/swagger";
+import { setIo } from "./config/socket";
+import { scheduleDailySummaryCron } from "./services/internal/notificationService";
 import authRoutes from "./routes/authRoutes";
 import roleRoutes from "./routes/roleRoutes";
 import locationRoutes from "./routes/locationRoutes";
@@ -29,6 +31,7 @@ import receiptRoutes from "./routes/receiptRoutes";
 import expenseRoutes from "./routes/expenseRoutes";
 import reportRoutes from "./routes/reportRoutes";
 import analyticsRoutes from "./routes/analyticsRoutes";
+import notificationRoutes from "./routes/notificationRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -161,6 +164,8 @@ app.use("/api/reports", reportRoutes);
 
 app.use("/api/analytics", analyticsRoutes);
 
+app.use("/api/notifications", notificationRoutes);
+
 // Main API endpoint
 app.get("/api", (_req, res) => {
   res.json({
@@ -207,6 +212,10 @@ io.on("connection", (socket) => {
 
 app.set("io", io);
 app.set("socketConnections", socketConnections);
+setIo(io);
+
+// Scheduled jobs
+scheduleDailySummaryCron();
 
 // 404 handler
 app.use((req, res) => {

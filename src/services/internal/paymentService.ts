@@ -6,6 +6,7 @@ import Shift from "../../models/Shift";
 import Branch from "../../models/Branch";
 import { completeTab } from "./tabService";
 import { generateReceipt } from "./receiptService";
+import { createNotification } from "./notificationService";
 import { generatePaymentNumber } from "../../utils/numberGenerators";
 import {
   initiateStkPush,
@@ -80,6 +81,16 @@ const completeMpesaPayment = async (
 
   await applySuccessfulPayment(payment, performedBy);
 
+  // Notify the cashier who took the payment that the STK push confirmed
+  await createNotification({
+    branch: payment.branch as any,
+    recipient: payment.processedBy as any,
+    type: "payment_success",
+    title: "M-Pesa payment confirmed",
+    message: `M-Pesa payment of KES ${payment.amount} confirmed (receipt ${mpesa.mpesaReceiptNumber || payment.paymentNumber}).`,
+    metadata: { paymentId: payment._id, amount: payment.amount, mpesaReceiptNumber: mpesa.mpesaReceiptNumber },
+  });
+
   return payment;
 };
 
@@ -101,6 +112,16 @@ const failMpesaPayment = async (
   }
   payment.mpesa = mpesa;
   await payment.save();
+
+  // Notify the cashier who took the payment so they can retry or fall back to cash
+  await createNotification({
+    branch: payment.branch as any,
+    recipient: payment.processedBy as any,
+    type: "mpesa_failed",
+    title: "M-Pesa payment failed",
+    message: `M-Pesa payment of KES ${payment.amount} failed${mpesa.resultDesc ? `: ${mpesa.resultDesc}` : "."}`,
+    metadata: { paymentId: payment._id, amount: payment.amount, resultCode: mpesa.resultCode },
+  });
 
   return payment;
 };

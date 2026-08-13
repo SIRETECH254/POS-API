@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { errorHandler } from "../middleware/errorHandler";
 import { uploadToCloudinary, deleteFromCloudinary } from "../config/cloudinary";
 import Expense from "../models/Expense";
+import { createNotification } from "../services/internal/notificationService";
 
 /**
  * Create expense
@@ -57,6 +58,16 @@ export const createExpense = async (req: Request, res: Response, next: NextFunct
       receiptPublicId,
       status: "pending",
       recordedBy: req.user?._id,
+    });
+
+    // Notify managers/admins that an expense is awaiting approval
+    await createNotification({
+      branch,
+      recipientRole: ["manager", "admin"],
+      type: "expense_pending_approval",
+      title: "Expense awaiting approval",
+      message: `A ${category} expense of KES ${amount} ("${description}") needs approval.`,
+      metadata: { expenseId: expense._id, category, amount },
     });
 
     // Return created expense

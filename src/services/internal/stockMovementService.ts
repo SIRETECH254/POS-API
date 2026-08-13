@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { errorHandler } from "../../middleware/errorHandler";
 import Product from "../../models/Product";
 import StockMovement from "../../models/StockMovement";
+import { sendLowStockAlert } from "./notificationService";
 import { IStockMovement, StockMovementRefType, StockMovementType } from "../../type";
 
 const INCREASING_TYPES: StockMovementType[] = ["purchased", "returned", "transferred_in"];
@@ -80,6 +81,17 @@ export const recordStockMovement = async (
     reason,
     performedBy,
   });
+
+  // Alert once a decreasing movement pushes stock at/below the branch minimum
+  if (DECREASING_TYPES.includes(type) && newBalance <= branchEntry.minimumStock) {
+    await sendLowStockAlert({
+      branch,
+      productName: product.name,
+      skuCode: skuDoc.skuCode,
+      currentStock: newBalance,
+      minimumStock: branchEntry.minimumStock,
+    });
+  }
 
   return movement;
 };

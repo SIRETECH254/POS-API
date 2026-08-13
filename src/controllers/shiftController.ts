@@ -5,6 +5,7 @@ import User from "../models/User";
 import Branch from "../models/Branch";
 import { IRole } from "../type";
 import { generateShiftNumber } from "../utils/numberGenerators";
+import { createNotification } from "../services/internal/notificationService";
 
 /**
  * Start shift
@@ -125,6 +126,16 @@ export const endShift = async (req: Request, res: Response, next: NextFunction):
 
     // Save shift
     await shift.save();
+
+    // Notify managers of the branch that the shift closed, with variance
+    await createNotification({
+      branch: shift.branch as any,
+      recipientRole: "manager",
+      type: "shift_closed",
+      title: "Shift closed",
+      message: `Shift ${shift.shiftNumber} closed. Expected KES ${expected}, actual KES ${actualCash}, variance KES ${variance}.`,
+      metadata: { shiftId: shift._id, expected, actual: actualCash, variance },
+    });
 
     // Clear currentShift on the staff member
     await User.findByIdAndUpdate(shift.staff, { $unset: { currentShift: 1 } });

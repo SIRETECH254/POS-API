@@ -6,6 +6,7 @@ import Supplier from "../models/Supplier";
 import Product from "../models/Product";
 import { generatePurchaseNumber } from "../utils/numberGenerators";
 import { recordStockMovement } from "../services/internal/stockMovementService";
+import { createNotification } from "../services/internal/notificationService";
 
 /**
  * Create purchase order
@@ -147,6 +148,16 @@ export const receiveGoods = async (req: Request, res: Response, next: NextFuncti
     purchase.receivedBy = req.user?._id as any;
     purchase.receivedAt = new Date();
     await purchase.save();
+
+    // Notify managers/store keepers that goods arrived
+    await createNotification({
+      branch: purchase.branch as any,
+      recipientRole: ["manager", "store_keeper"],
+      type: "purchase_received",
+      title: "Purchase order received",
+      message: `Purchase order ${purchase.purchaseNumber} (KES ${purchase.totalAmount}) has been received into stock.`,
+      metadata: { purchaseId: purchase._id, totalAmount: purchase.totalAmount },
+    });
 
     // Return updated purchase order
     res.status(200).json({
