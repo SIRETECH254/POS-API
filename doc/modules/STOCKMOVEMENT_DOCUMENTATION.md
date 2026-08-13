@@ -157,6 +157,7 @@ The single entry point for all branch-scoped stock changes. Any future controlle
 3. Compute the signed delta from `type`: `purchased`/`returned`/`transferred_in` apply `+Math.abs(quantity)`; `sold`/`damaged`/`transferred_out` apply `-Math.abs(quantity)`; `adjusted` applies `quantity` exactly as given (positive or negative correction)
 4. Guard — the resulting balance must not go negative
 5. Persist the new `currentStock` on the Product, then create the immutable `StockMovement` record with `balanceAfter` set to the new balance
+6. If the movement was decreasing and the new balance is at or below the branch's `minimumStock`, notify the branch's managers/store keepers (`low_stock`, via `notificationService.sendLowStockAlert`) — see `doc/modules/NOTIFICATION_DOCUMENTATION.md`
 
 **Implementation:**
 ```typescript
@@ -164,6 +165,7 @@ import { Types } from "mongoose";
 import { errorHandler } from "../../middleware/errorHandler";
 import Product from "../../models/Product";
 import StockMovement from "../../models/StockMovement";
+import { sendLowStockAlert } from "./notificationService";
 import { IStockMovement, StockMovementRefType, StockMovementType } from "../../type";
 
 const INCREASING_TYPES: StockMovementType[] = ["purchased", "returned", "transferred_in"];
@@ -231,6 +233,17 @@ export const recordStockMovement = async (
     reason,
     performedBy,
   });
+
+  // Alert once a decreasing movement pushes stock at/below the branch minimum
+  if (DECREASING_TYPES.includes(type) && newBalance <= branchEntry.minimumStock) {
+    await sendLowStockAlert({
+      branch,
+      productName: product.name,
+      skuCode: skuDoc.skuCode,
+      currentStock: newBalance,
+      minimumStock: branchEntry.minimumStock,
+    });
+  }
 
   return movement;
 };
@@ -547,6 +560,7 @@ curl -X GET http://localhost:3500/api/stock-movements/64f1a2b3c4d5e6f7a8b9c0e1 \
 - **Immutability:** No update or delete endpoint exists for this module, matching the ledger's audit requirement — a movement, once written, is permanent.
 - **Single write path:** `stockMovementService.recordStockMovement()` is the only code path meant to change `stockByBranch.currentStock`, so every stock change is guaranteed to leave a matching ledger entry once Purchase/Tab/StockAdjustment/Transfer are wired to call it.
 - **Non-negative balance guard:** the service rejects any movement that would drive `currentStock` below zero.
+- **Low-stock alerts are event-driven, not a periodic scan:** the moment a decreasing movement crosses `minimumStock`, `sendLowStockAlert()` fires from inside `recordStockMovement()` itself — see `doc/modules/NOTIFICATION_DOCUMENTATION.md`.
 
 ---
 

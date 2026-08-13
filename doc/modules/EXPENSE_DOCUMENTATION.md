@@ -23,6 +23,7 @@ Expense records every operational outgoing cost a branch incurs — rent, electr
 - **`receiptPublicId` was added alongside the documented `receiptUrl`.** Per this codebase's Cloudinary convention, every model with a Cloudinary asset stores both the `url` and the `public_id` (needed to delete/replace the asset later).
 - **No auto-generated number field.** Unlike Payment/Purchase/Receipt, the documented spec has no `expenseNumber`, so none was added.
 - **No `AuditLog` write anywhere in this module.** No `AuditLog` model exists in this codebase yet.
+- **`createExpense()` notifies managers/admins.** An `expense_pending_approval` notification (via `notificationService.createNotification`) goes out the moment an expense is recorded, so approval isn't gated on someone thinking to check. See `doc/modules/NOTIFICATION_DOCUMENTATION.md`.
 
 ---
 
@@ -165,6 +166,7 @@ import type { Request, Response, NextFunction } from "express";
 import { errorHandler } from "../middleware/errorHandler";
 import { uploadToCloudinary, deleteFromCloudinary } from "../config/cloudinary";
 import Expense from "../models/Expense";
+import { createNotification } from "../services/internal/notificationService";
 ```
 
 ### Functions Overview
@@ -173,7 +175,7 @@ import Expense from "../models/Expense";
 **Purpose:** Record a new operational expense against a branch
 **Access:** Store Keeper, Manager, Admin
 **Validation:** `branch`, `category`, `description`, `amount`, `paymentMethod`, `expenseDate` are required
-**Process:** Upload receipt to Cloudinary if a file is provided, create the expense as `pending`
+**Process:** Upload receipt to Cloudinary if a file is provided, create the expense as `pending`, notify the branch's managers/admins that it needs approval
 **Response:** Created expense
 
 **Controller Implementation:**
@@ -224,6 +226,16 @@ export const createExpense = async (req: Request, res: Response, next: NextFunct
       receiptPublicId,
       status: "pending",
       recordedBy: req.user?._id,
+    });
+
+    // Notify managers/admins that an expense is awaiting approval
+    await createNotification({
+      branch,
+      recipientRole: ["manager", "admin"],
+      type: "expense_pending_approval",
+      title: "Expense awaiting approval",
+      message: `A ${category} expense of KES ${amount} ("${description}") needs approval.`,
+      metadata: { expenseId: expense._id, category, amount },
     });
 
     // Return created expense

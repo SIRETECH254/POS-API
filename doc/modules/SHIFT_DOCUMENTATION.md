@@ -23,6 +23,7 @@ A **Shift** represents a single working session for a staff member at a branch. 
 - Closing a shift computes `expected = openingFloat + cashSales` and `variance = actual − expected`.
 - A manager must review and sign off on any variance via `review-variance`.
 - The `requireActiveShift` middleware (applied to Tab routes) enforces that no tab can be opened without a current active shift.
+- Closing a shift notifies the branch's managers (`shift_closed`, via `notificationService.createNotification`, including the expected/actual/variance figures) — see `doc/modules/NOTIFICATION_DOCUMENTATION.md`.
 
 ---
 
@@ -158,6 +159,7 @@ import User from "../models/User";
 import Branch from "../models/Branch";
 import { IRole } from "../type";
 import { generateShiftNumber } from "../utils/numberGenerators";
+import { createNotification } from "../services/internal/notificationService";
 ```
 
 ### Functions Overview
@@ -239,7 +241,7 @@ export const startShift = async (req: Request, res: Response, next: NextFunction
 **Purpose:** Close an open shift and compute the cash variance
 **Access:** Shift owner (self-close) or Manager/Admin
 **Validation:** `actualCash` required; shift must exist and be open; requester must own the shift or be manager/admin
-**Process:** Compute `expected = openingFloat + cashSales`, `variance = actualCash − expected`, set `closingCash`, mark `status: "closed"`, clear `user.currentShift`
+**Process:** Compute `expected = openingFloat + cashSales`, `variance = actualCash − expected`, set `closingCash`, mark `status: "closed"`, notify the branch's managers (`shift_closed`, via `notificationService.createNotification` — see `doc/modules/NOTIFICATION_DOCUMENTATION.md`), clear `user.currentShift`
 **Response:** 200 — closed shift with variance data
 
 **Controller Implementation:**
@@ -288,6 +290,16 @@ export const endShift = async (req: Request, res: Response, next: NextFunction):
 
     // Save shift
     await shift.save();
+
+    // Notify managers of the branch that the shift closed, with variance
+    await createNotification({
+      branch: shift.branch,
+      recipientRole: "manager",
+      type: "shift_closed",
+      title: "Shift closed",
+      message: `Shift ${shift.shiftNumber} closed. Expected KES ${expected}, actual KES ${actualCash}, variance KES ${variance}.`,
+      metadata: { shiftId: shift._id, expected, actual: actualCash, variance },
+    });
 
     // Clear currentShift on the staff member
     await User.findByIdAndUpdate(shift.staff, { $unset: { currentShift: 1 } });

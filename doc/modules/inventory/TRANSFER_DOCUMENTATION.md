@@ -166,6 +166,7 @@ import Branch from "../models/Branch";
 import Product from "../models/Product";
 import { generateTransferNumber } from "../utils/numberGenerators";
 import { recordStockMovement } from "../services/internal/stockMovementService";
+import { createNotification } from "../services/internal/notificationService";
 ```
 
 ### Functions Overview
@@ -310,7 +311,7 @@ export const dispatchTransfer = async (req: Request, res: Response, next: NextFu
 **Purpose:** Receive an in-transit transfer, incrementing stock at the destination branch
 **Access:** Store Keeper, Manager, Admin
 **Validation:** Transfer must exist and be in `'in_transit'` status
-**Process:** Record a `transferred_in` stock movement per item, mark as `received`
+**Process:** Record a `transferred_in` stock movement per item, mark as `received`, notify the receiving branch's managers
 **Response:** Updated transfer
 
 **Controller Implementation:**
@@ -342,6 +343,16 @@ export const receiveTransfer = async (req: Request, res: Response, next: NextFun
     transfer.receivedBy = req.user?._id as any;
     transfer.receivedAt = new Date();
     await transfer.save();
+
+    // Notify managers at the receiving branch
+    await createNotification({
+      branch: transfer.toBranch as any,
+      recipientRole: "manager",
+      type: "transfer_received",
+      title: "Stock transfer received",
+      message: `Transfer ${transfer.transferNumber} has arrived and been added to stock.`,
+      metadata: { transferId: transfer._id, fromBranch: transfer.fromBranch },
+    });
 
     res.status(200).json({
       success: true,

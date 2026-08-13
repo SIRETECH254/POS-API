@@ -305,6 +305,7 @@ import Shift from "../models/Shift";
 import { IRole } from "../type";
 import { generateTabNumber } from "../utils/numberGenerators";
 import { mergeTabs as mergeTabsService, splitBill as splitBillService } from "../services/internal/tabService";
+import { createNotification } from "../services/internal/notificationService";
 ```
 
 ### Functions Overview
@@ -854,7 +855,7 @@ export const splitBill = async (req: Request, res: Response, next: NextFunction)
 **Purpose:** Cancel a tab before payment
 **Access:** Bartender, Manager, Admin
 **Validation:** Tab must exist and not already be completed/cancelled/archived; `cancelReason` required
-**Process:** Set status to cancelled, increment `shift.salesSummary.tabsCancelled`
+**Process:** Set status to cancelled, increment `shift.salesSummary.tabsCancelled`, notify the branch's managers
 **Response:** Updated tab
 
 **Controller Implementation:**
@@ -888,6 +889,16 @@ export const cancelTab = async (req: Request, res: Response, next: NextFunction)
     // Increment shift tabsCancelled counter
     await Shift.findByIdAndUpdate(tab.shift, {
       $inc: { "salesSummary.tabsCancelled": 1 },
+    });
+
+    // Notify managers of the branch
+    await createNotification({
+      branch: tab.branch as any,
+      recipientRole: "manager",
+      type: "tab_cancelled",
+      title: "Tab cancelled",
+      message: `Tab ${tab.tabNumber} was cancelled: ${cancelReason}`,
+      metadata: { tabId: tab._id, cancelReason },
     });
 
     // Return updated tab

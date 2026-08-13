@@ -191,6 +191,7 @@ import Supplier from "../models/Supplier";
 import Product from "../models/Product";
 import { generatePurchaseNumber } from "../utils/numberGenerators";
 import { recordStockMovement } from "../services/internal/stockMovementService";
+import { createNotification } from "../services/internal/notificationService";
 ```
 
 ### Functions Overview
@@ -302,7 +303,7 @@ export const createPurchaseOrder = async (req: Request, res: Response, next: Nex
 **Purpose:** Mark a purchase order as received and increment branch stock for each item
 **Access:** Store Keeper, Manager, Admin
 **Validation:** Purchase must exist and be in `'ordered'` status
-**Process:** Record a stock movement per item via `stockMovementService`, mark purchase as received
+**Process:** Record a stock movement per item via `stockMovementService`, mark purchase as received, notify the branch's managers/store keepers
 **Response:** Updated purchase order
 
 **Controller Implementation:**
@@ -340,6 +341,16 @@ export const receiveGoods = async (req: Request, res: Response, next: NextFuncti
     purchase.receivedBy = req.user?._id as any;
     purchase.receivedAt = new Date();
     await purchase.save();
+
+    // Notify managers/store keepers that goods arrived
+    await createNotification({
+      branch: purchase.branch as any,
+      recipientRole: ["manager", "store_keeper"],
+      type: "purchase_received",
+      title: "Purchase order received",
+      message: `Purchase order ${purchase.purchaseNumber} (KES ${purchase.totalAmount}) has been received into stock.`,
+      metadata: { purchaseId: purchase._id, totalAmount: purchase.totalAmount },
+    });
 
     // Return updated purchase order
     res.status(200).json({

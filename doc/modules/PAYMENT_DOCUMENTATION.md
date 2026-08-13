@@ -21,7 +21,7 @@ Payment is where a **Tab**'s `awaiting_payment` state resolves. A Tab can carry 
 - **Cash and M-Pesa only.** Card/Paystack support is deferred — `IPayment.method` is `'cash' | 'mpesa'`, there is no `card` sub-object, and there is no `payCard()`/`recordMixedPayment()` endpoint. Mixed payment already works without a dedicated `/mixed` route: call `POST /cash` then `POST /mpesa/initiate` (or vice versa) against the same `tabId` for the remainder.
 - **No `AuditLog` write anywhere in this module.** No `AuditLog` model exists in this codebase yet. This is why `retryMpesaPayment()` creates a **new** Payment document instead of mutating the failed one — the Payment collection itself is the only durable record of what was attempted.
 - **Payment reversal is narrower than it looks.** `reversePayment()` is blocked once the tab it belongs to has reached `completed` (stock already deducted, no refund path exists) and once the tab's shift has `closed` (its cash reconciliation already ran against `salesSummary`). Because a single full payment finishes the tab in the same request that completes it, `reversePayment()` is realistically only usable in the partial/mixed-payment window — e.g. undoing a wrong cash tender before an M-Pesa top-up finishes the sale.
-- **Real-time Socket.io events are not wired.** Only per-user rooms (`user_{userId}`) exist in `src/index.ts` today; no controller in this module emits Socket.io events.
+- **Notifications on mpesa outcomes.** `completeMpesaPayment()` and `failMpesaPayment()` (the private handlers `mpesaCallback`/`getMpesaPaymentStatus` funnel through) each call `notificationService.createNotification()` — `payment_success` / `mpesa_failed` — addressed to `payment.processedBy`, the cashier who took the payment. Cash payments don't get one; they're synchronous, so there's nothing async to confirm. This is also this module's first real-time Socket.io traffic: notifications push to the recipient's `user_{userId}` room. See `doc/modules/NOTIFICATION_DOCUMENTATION.md`.
 - **Branch/shift are derived from the Tab, not the requesting user.** A cashier's own `currentShift` isn't necessarily the shift that opened the tab (a tab opened by a bartender may be closed out by a different cashier later in the same shift, or after a shift handover), so every payment inherits `tab.branch`/`tab.shift` directly.
 
 ---
@@ -283,7 +283,7 @@ export const initiateMpesaPayment = async (req: Request, res: Response, next: Ne
 **Purpose:** Receive the asynchronous Daraja STK push result
 **Access:** Public — called directly by Safaricom, not by an authenticated app user
 **Validation:** None — malformed or unrecognized payloads are logged and silently ignored
-**Process:** Delegates to `paymentService.handleMpesaCallback`. **Never calls `next(error)`** — Safaricom expects a fast, clean `200` and will retry the webhook otherwise, so internal failures are caught and logged instead of surfaced
+**Process:** Delegates to `paymentService.handleMpesaCallback`, which resolves to `completeMpesaPayment()` or `failMpesaPayment()` — each notifies `payment.processedBy` (`payment_success`/`mpesa_failed`) via `notificationService.createNotification`. **Never calls `next(error)`** — Safaricom expects a fast, clean `200` and will retry the webhook otherwise, so internal failures are caught and logged instead of surfaced
 **Response:** Always `200` with `{ ResultCode: 0, ResultDesc: "Accepted" }`, regardless of internal outcome
 
 **Controller Implementation:**
@@ -457,7 +457,7 @@ export const getTabPayments = async (req: Request, res: Response, next: NextFunc
 **Purpose:** Manually reconcile a pending M-Pesa payment's status against Daraja
 **Access:** Bartender, Cashier, Manager, Admin, Accountant
 **Validation:** `checkoutRequestId` must match an existing payment
-**Process:** Delegates to `paymentService.reconcileMpesaPayment` — no-ops (returns the payment as-is) if it isn't `pending`, so repeated polling never re-queries Daraja unnecessarily
+**Process:** Delegates to `paymentService.reconcileMpesaPayment` — no-ops (returns the payment as-is) if it isn't `pending`, so repeated polling never re-queries Daraja unnecessarily; otherwise resolves to the same `completeMpesaPayment()`/`failMpesaPayment()` notification-sending paths as the webhook
 **Response:** Current payment status
 
 **Controller Implementation:**
