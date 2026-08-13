@@ -5,6 +5,7 @@ import User from "../models/User";
 import Role from "../models/Role";
 import Branch from "../models/Branch";
 import { deleteFromCloudinary } from "../config/cloudinary";
+import { logAudit } from "../services/internal/auditService";
 
 /**
  * Create staff
@@ -240,6 +241,9 @@ export const updateStaff = async (req: Request, res: Response, next: NextFunctio
       }
     }
 
+    // Snapshot pre-update role — captured before any field is overwritten
+    const roleBefore = user.role;
+
     // Apply updates
     if (firstName !== undefined) {
       user.firstName = firstName;
@@ -257,8 +261,24 @@ export const updateStaff = async (req: Request, res: Response, next: NextFunctio
       user.branch = branchId;
     }
 
-    // Save and populate
+    // Save
     await user.save();
+
+    // Audit role changes only
+    if (roleId !== undefined) {
+      await logAudit({
+        branch: user.branch as any,
+        user: req.user?._id as any,
+        action: "ROLE_CHANGED",
+        entityType: "User",
+        entityId: user._id as any,
+        before: { role: roleBefore },
+        after: { role: roleId },
+        ipAddress: req.ip,
+      });
+    }
+
+    // Populate for response
     await user.populate([{ path: "role" }, { path: "branch" }]);
 
     // Return updated staff

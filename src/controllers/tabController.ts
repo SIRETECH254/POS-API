@@ -8,6 +8,7 @@ import { IRole } from "../type";
 import { generateTabNumber } from "../utils/numberGenerators";
 import { mergeTabs as mergeTabsService, splitBill as splitBillService } from "../services/internal/tabService";
 import { createNotification } from "../services/internal/notificationService";
+import { logAudit } from "../services/internal/auditService";
 
 /**
  * Resolves the branch a list endpoint should be scoped to.
@@ -542,10 +543,25 @@ export const cancelTab = async (req: Request, res: Response, next: NextFunction)
       return next(errorHandler(409, "Tab cannot be cancelled in its current status"));
     }
 
+    // Snapshot pre-cancellation status
+    const statusBefore = tab.status;
+
     // Cancel tab
     tab.status = "cancelled";
     tab.cancelReason = cancelReason;
     await tab.save();
+
+    // Audit the cancellation
+    await logAudit({
+      branch: tab.branch as any,
+      user: req.user?._id as any,
+      action: "TAB_CANCELLED",
+      entityType: "Tab",
+      entityId: tab._id as any,
+      before: { status: statusBefore },
+      after: { status: "cancelled", cancelReason },
+      ipAddress: req.ip,
+    });
 
     // Increment shift tabsCancelled counter
     await Shift.findByIdAndUpdate(tab.shift, {

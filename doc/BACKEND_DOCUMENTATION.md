@@ -362,7 +362,7 @@ interface IPayment {
 **Notes:**
 - A single Tab can have **multiple Payment records** (Mixed Payment) — e.g. one `cash` + one `mpesa` record summing to the grand total. This needs no dedicated endpoint: call `POST /cash` then `POST /mpesa/initiate` (or vice versa) against the same tab.
 - M-Pesa payments are created as `pending` on STK push, then flipped to `completed`/`failed` by the Daraja callback (`POST /api/payments/mpesa/callback`).
-- Reversal is restricted to `manager`/`admin` roles, and is additionally blocked once the payment's tab is `completed` or its shift is `closed` — see `doc/modules/PAYMENT_DOCUMENTATION.md` for the full rationale. No `AuditLog` model exists yet, so reversal is not separately logged there.
+- Reversal is restricted to `manager`/`admin` roles, and is additionally blocked once the payment's tab is `completed` or its shift is `closed` — see `doc/modules/PAYMENT_DOCUMENTATION.md` for the full rationale. Every reversal now writes a `PAYMENT_REVERSED` `AuditLog` entry (`before`/`after` status) via `auditService.logAudit()` — see `doc/modules/AUDIT_DOCUMENTATION.md`.
 - **Card/Paystack support is deferred.** `method` and the model no longer include `card` — only `cash`/`mpesa` are implemented for this pass.
 
 ---
@@ -537,14 +537,14 @@ interface IShift {
 
 ---
 
-### 18. AuditLog Model
+### 18. AuditLog Model *(implemented)*
 ```typescript
 interface IAuditLog {
   _id: ObjectId;
-  branch: ObjectId; // ref: Branch
+  branch?: ObjectId; // ref: Branch — optional; absent for entities with no inherent branch (SKU)
   user: ObjectId; // ref: User
-  action: string; // e.g. 'PRICE_CHANGE', 'TAB_CANCELLED', 'PAYMENT_REVERSED', 'STOCK_ADJUSTED'
-  entityType: string; // 'SKU', 'Tab', 'Payment', ...
+  action: 'PRICE_CHANGE' | 'TAB_CANCELLED' | 'PAYMENT_REVERSED' | 'ROLE_CHANGED';
+  entityType: 'SKU' | 'Tab' | 'Payment' | 'User';
   entityId: ObjectId;
   before: Record<string, any>; // relevant snapshot before the change
   after: Record<string, any>; // relevant snapshot after the change
@@ -552,7 +552,9 @@ interface IAuditLog {
   createdAt: Date;
 }
 ```
-**Notes:** written automatically by a mongoose post-hook / service wrapper on sensitive writes (price edits, cancellations, reversals, role changes, discounts). Never editable or deletable, even by administrators.
+**Notes:**
+- Written via an explicit `auditService.logAudit()` call inside each of the four sensitive operations, not a mongoose post-hook or generic middleware — see the corrected Audit Logging note below. Never editable or deletable, even by administrators (no update/delete route exists at all).
+- `action`/`entityType` are typed unions scoped to the four operations wired this pass, not the originally-sketched free-form `string`. See `doc/modules/AUDIT_DOCUMENTATION.md` for the full rationale.
 
 ---
 
@@ -887,7 +889,7 @@ interface ITransfer {
 - `payCash()` — receive amount, calculate change, apply immediately (no pending state)
 - `initiateMpesaPayment()` — STK Push, creates a pending payment
 - `mpesaCallback()` — Daraja webhook, confirms/fails payment, auto-completes Tab when `amountPaid >= grandTotal`; always acks Safaricom with `200` regardless of internal outcome
-- `retryMpesaPayment()` — creates a new payment for a failed one; original is left as history (no `AuditLog` exists yet)
+- `retryMpesaPayment()` — creates a new payment for a failed one; original is left as history. `AuditLog` now exists (see `doc/modules/AUDIT_DOCUMENTATION.md`) but `retryMpesaPayment` isn't one of the four operations wired to it this pass — only `reversePayment` writes a `PAYMENT_REVERSED` entry
 - `reversePayment()` — manager/admin only; generalized to reverse cash or mpesa payments, not mpesa-specific as originally named
 - `getPayment()`
 - `getTabPayments()`
@@ -976,9 +978,10 @@ interface ITransfer {
 - `markAllAsRead()`
 > **Implementation note:** `sendLowStockAlert()` and `sendDailySummary()` are not controller actions — they have no route. Both live in `services/internal/notificationService.ts`: `sendLowStockAlert()` fires event-driven (inline in `stockMovementService.recordStockMovement`, the moment stock crosses the threshold — not a per-branch scan), and `sendDailySummary()` is genuinely cron-triggered via `node-cron`, registered once from `src/index.ts`. See `doc/modules/NOTIFICATION_DOCUMENTATION.md`.
 
-### 21. Audit Controller — `auditController.ts`
-- `getAuditLogs()` — filterable by branch/user/entity/date, admin & manager only
+### 21. Audit Controller — `auditController.ts` *(implemented)*
+- `getAuditLogs()` — filterable by branch/user/entityType/action/date, manager & admin only
 - `getEntityHistory(entityType, entityId)`
+> No `createAuditLog`/`updateAuditLog`/`deleteAuditLog` — entries are written by `auditService.logAudit()`, called explicitly from the four sensitive operations themselves. See `doc/modules/AUDIT_DOCUMENTATION.md`.
 
 ### 22. Settings Controller — `settingsController.ts`
 - `getSettings(branchId)`
@@ -1275,12 +1278,13 @@ PATCH  /read-all
 ```
 No `authorizeRoles` on any route — every authenticated user manages only their own inbox, scoped by `req.user._id`. See `doc/modules/NOTIFICATION_DOCUMENTATION.md`.
 
-### Audit Routes
+### Audit Routes *(implemented)*
 **Base:** `/api/audit-logs`
 ```
-GET    /                              // manager/admin, filterable, scoped to branch
-GET    /entity/:entityType/:entityId
+GET    /                              // manager/admin, filterable (branch/user/entityType/action/date)
+GET    /entity/:entityType/:entityId  // manager/admin
 ```
+No `POST`/`PUT`/`DELETE` — immutable by omission, not by guard. See `doc/modules/AUDIT_DOCUMENTATION.md`.
 
 ### Settings Routes
 **Base:** `/api/settings`
@@ -1448,7 +1452,7 @@ club-pos-api/
 │   │   ├── auth.ts                  # authenticateToken, authorizeRoles, requirePermission
 │   │   ├── requireActiveShift.ts    # blocks tab creation without an open shift
 │   │   ├── requireBranchAccess.ts   # scopes/blocks requests to the user's branch (admins can override via query param)
-│   │   ├── auditLogger.ts           # wraps sensitive writes, writes AuditLog entries
+│   │   ├── (no auditLogger.ts — see services/internal/auditService.ts instead)
 │   │   ├── errorHandler.ts
 │   │   └── validate.ts              # Joi schema validation wrapper
 │   ├── services/
@@ -1488,8 +1492,9 @@ club-pos-api/
 - `requireBranchAccess` — ensures a user can only read/write data belonging to their own branch; administrators can pass an explicit `branch` query param to view another branch or a consolidated view
 - `optionalAuth` — for any public-facing endpoints
 
-#### Audit Logging
-- `auditLogger(entityType, action)` — attached to sensitive routes (price edits, tab cancellation, payment reversal, role assignment); diffs the before/after state and writes to `AuditLog`
+#### Audit Logging *(corrected — implemented differently than originally sketched)*
+- No `auditLogger` middleware exists — a generic middleware only sees `req`/`res`, not the before/after DB state, and none of the four target handlers use a `res.locals`-style convention a middleware could read a diff from (no such convention exists anywhere in this codebase).
+- Instead: `auditService.logAudit()` (`src/services/internal/auditService.ts`) is called **explicitly** from inside each of the four sensitive operations — `skuController.updateSku` (price edits), `tabController.cancelTab`, `paymentService.reversePayment`, `userController.updateStaff` (role assignment) — right after each one's state change already committed. See `doc/modules/AUDIT_DOCUMENTATION.md`.
 
 #### File Upload
 - Handled via `config/cloudinary.ts`
@@ -1531,7 +1536,7 @@ draft → open → (items added) → awaiting_payment
 **Rules enforced in `tabService.ts`:**
 - Inventory is only deducted (via `StockMovement type: 'sold'`, against the SKU's `stockByBranch` entry for the tab's branch) when a Tab transitions to `completed`, not when items are merely added — this keeps held/cancelled tabs from falsely reserving stock.
 - `awaiting_payment → completed` only fires once `amountPaid >= grandTotal` across all linked Payment records (supports Mixed Payment).
-- Cancelling a Tab after items were added requires a `cancelReason` and is written to `AuditLog`.
+- Cancelling a Tab requires a `cancelReason` and writes a `TAB_CANCELLED` `AuditLog` entry (`before`/`after` status) via `auditService.logAudit()`, regardless of whether items had been added — see `doc/modules/AUDIT_DOCUMENTATION.md`.
 - Merge and Split always produce new/updated Tab documents rather than mutating history in place, and are only permitted between tabs on the same branch.
 
 ---

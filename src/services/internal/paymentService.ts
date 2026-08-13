@@ -7,6 +7,7 @@ import Branch from "../../models/Branch";
 import { completeTab } from "./tabService";
 import { generateReceipt } from "./receiptService";
 import { createNotification } from "./notificationService";
+import { logAudit } from "./auditService";
 import { generatePaymentNumber } from "../../utils/numberGenerators";
 import {
   initiateStkPush,
@@ -394,7 +395,8 @@ export const reconcileMpesaPayment = async (
 export const reversePayment = async (
   paymentId: string | Types.ObjectId,
   reversedBy: string | Types.ObjectId,
-  reversedReason: string
+  reversedReason: string,
+  ipAddress?: string
 ): Promise<IPayment> => {
   const payment = await Payment.findById(paymentId);
   if (!payment) {
@@ -423,10 +425,24 @@ export const reversePayment = async (
     throw errorHandler(409, "Payment cannot be reversed after the shift has been closed");
   }
 
+  const statusBefore = payment.status;
+
   payment.status = "reversed";
   payment.reversedBy = reversedBy as any;
   payment.reversedReason = reversedReason;
   await payment.save();
+
+  // Audit the reversal
+  await logAudit({
+    branch: payment.branch as any,
+    user: reversedBy,
+    action: "PAYMENT_REVERSED",
+    entityType: "Payment",
+    entityId: payment._id as any,
+    before: { status: statusBefore },
+    after: { status: "reversed", reversedReason },
+    ipAddress,
+  });
 
   tab.amountPaid -= payment.amount;
   tab.balanceDue = tab.grandTotal - tab.amountPaid;

@@ -306,6 +306,7 @@ import { IRole } from "../type";
 import { generateTabNumber } from "../utils/numberGenerators";
 import { mergeTabs as mergeTabsService, splitBill as splitBillService } from "../services/internal/tabService";
 import { createNotification } from "../services/internal/notificationService";
+import { logAudit } from "../services/internal/auditService";
 ```
 
 ### Functions Overview
@@ -855,7 +856,7 @@ export const splitBill = async (req: Request, res: Response, next: NextFunction)
 **Purpose:** Cancel a tab before payment
 **Access:** Bartender, Manager, Admin
 **Validation:** Tab must exist and not already be completed/cancelled/archived; `cancelReason` required
-**Process:** Set status to cancelled, increment `shift.salesSummary.tabsCancelled`, notify the branch's managers
+**Process:** Set status to cancelled, write a `TAB_CANCELLED` `AuditLog` entry, increment `shift.salesSummary.tabsCancelled`, notify the branch's managers
 **Response:** Updated tab
 
 **Controller Implementation:**
@@ -881,10 +882,25 @@ export const cancelTab = async (req: Request, res: Response, next: NextFunction)
       return next(errorHandler(409, "Tab cannot be cancelled in its current status"));
     }
 
+    // Snapshot pre-cancellation status
+    const statusBefore = tab.status;
+
     // Cancel tab
     tab.status = "cancelled";
     tab.cancelReason = cancelReason;
     await tab.save();
+
+    // Audit the cancellation
+    await logAudit({
+      branch: tab.branch as any,
+      user: req.user?._id as any,
+      action: "TAB_CANCELLED",
+      entityType: "Tab",
+      entityId: tab._id as any,
+      before: { status: statusBefore },
+      after: { status: "cancelled", cancelReason },
+      ipAddress: req.ip,
+    });
 
     // Increment shift tabsCancelled counter
     await Shift.findByIdAndUpdate(tab.shift, {

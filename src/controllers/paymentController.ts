@@ -162,7 +162,8 @@ export const reversePayment = async (req: Request, res: Response, next: NextFunc
     const payment = await reversePaymentService(
       req.params.paymentId as string,
       req.user?._id as any,
-      reversedReason
+      reversedReason,
+      req.ip
     );
 
     // Return reversed payment

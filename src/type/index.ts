@@ -479,3 +479,19 @@ export interface INotification extends Document {
   readAt?: Date;
   createdAt: Date;
 }
+
+// AuditLog
+export type AuditAction = "PRICE_CHANGE" | "TAB_CANCELLED" | "PAYMENT_REVERSED" | "ROLE_CHANGED";
+export type AuditEntityType = "SKU" | "Tab" | "Payment" | "User";
+
+export interface IAuditLog extends Document {
+  branch?: Types.ObjectId | IBranch;
+  user: Types.ObjectId | IUser;
+  action: AuditAction;
+  entityType: AuditEntityType;
+  entityId: Types.ObjectId;
+  before?: Record<string, any>;
+  after?: Record<string, any>;
+  ipAddress?: string;
+  createdAt: Date;
+}

@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
 import { errorHandler } from "../middleware/errorHandler";
 import Product from "../models/Product";
+import { logAudit } from "../services/internal/auditService";
 
 /**
  * Get all SKUs
@@ -274,8 +275,29 @@ export const updateSku = async (req: Request, res: Response, next: NextFunction)
       updateData.isActive = isActive;
     }
 
+    // Snapshot pre-update price fields — product.updateSKU mutates the
+    // subdocument in place, so this must happen before that call
+    const skuBeforeUpdate = product.skus.id(req.params.skuId as string);
+    const priceBefore = { buyingPrice: skuBeforeUpdate?.buyingPrice, sellingPrice: skuBeforeUpdate?.sellingPrice };
+
     // Apply update via instance method
     await product.updateSKU(req.params.skuId as string, updateData);
+
+    // Audit price changes only — skip barcode/status-only edits.
+    // SKUs aren't branch-scoped (only stockByBranch is), so this is
+    // attributed to the acting user's own branch.
+    if (buyingPrice !== undefined || sellingPrice !== undefined) {
+      await logAudit({
+        branch: req.user?.branch as any,
+        user: req.user?._id as any,
+        action: "PRICE_CHANGE",
+        entityType: "SKU",
+        entityId: req.params.skuId as string,
+        before: priceBefore,
+        after: { buyingPrice, sellingPrice },
+        ipAddress: req.ip,
+      });
+    }
 
     // Return success
     res.status(200).json({

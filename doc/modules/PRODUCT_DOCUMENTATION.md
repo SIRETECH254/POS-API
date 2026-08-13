@@ -530,6 +530,7 @@ import type { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
 import { errorHandler } from "../middleware/errorHandler";
 import Product from "../models/Product";
+import { logAudit } from "../services/internal/auditService";
 ```
 
 ### Functions Overview
@@ -742,7 +743,7 @@ export const createSku = async (req: Request, res: Response, next: NextFunction)
 **Purpose:** Update individual fields on an existing SKU subdocument
 **Access:** Manager, Admin
 **Validation:** Product and SKU must exist; skuCode/barcode uniqueness if changed
-**Process:** Find product+SKU → build updateData → call product.updateSKU(skuId, data)
+**Process:** Find product+SKU → build updateData → call product.updateSKU(skuId, data) → audit a `PRICE_CHANGE` if the update touched `buyingPrice`/`sellingPrice`
 **Response:** Updated product
 
 **Controller Implementation:**
@@ -812,8 +813,29 @@ export const updateSku = async (req: Request, res: Response, next: NextFunction)
       updateData.isActive = isActive;
     }
 
+    // Snapshot pre-update price fields — product.updateSKU mutates the
+    // subdocument in place, so this must happen before that call
+    const skuBeforeUpdate = product.skus.id(req.params.skuId);
+    const priceBefore = { buyingPrice: skuBeforeUpdate?.buyingPrice, sellingPrice: skuBeforeUpdate?.sellingPrice };
+
     // Apply update via instance method
     await product.updateSKU(req.params.skuId, updateData);
+
+    // Audit price changes only — skip barcode/status-only edits.
+    // SKUs aren't branch-scoped (only stockByBranch is), so this is
+    // attributed to the acting user's own branch.
+    if (buyingPrice !== undefined || sellingPrice !== undefined) {
+      await logAudit({
+        branch: req.user?.branch,
+        user: req.user?._id,
+        action: "PRICE_CHANGE",
+        entityType: "SKU",
+        entityId: req.params.skuId,
+        before: priceBefore,
+        after: { buyingPrice, sellingPrice },
+        ipAddress: req.ip,
+      });
+    }
 
     // Return success
     res.status(200).json({
@@ -826,6 +848,7 @@ export const updateSku = async (req: Request, res: Response, next: NextFunction)
   }
 };
 ```
+> See `doc/modules/AUDIT_DOCUMENTATION.md` for the full `PRICE_CHANGE` audit trigger.
 
 #### `deleteSku()`
 **Purpose:** Remove a SKU subdocument from a product

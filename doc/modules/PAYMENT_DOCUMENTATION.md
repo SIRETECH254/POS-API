@@ -19,7 +19,7 @@ Payment is where a **Tab**'s `awaiting_payment` state resolves. A Tab can carry 
 
 **Scope notes for this pass:**
 - **Cash and M-Pesa only.** Card/Paystack support is deferred — `IPayment.method` is `'cash' | 'mpesa'`, there is no `card` sub-object, and there is no `payCard()`/`recordMixedPayment()` endpoint. Mixed payment already works without a dedicated `/mixed` route: call `POST /cash` then `POST /mpesa/initiate` (or vice versa) against the same `tabId` for the remainder.
-- **No `AuditLog` write anywhere in this module.** No `AuditLog` model exists in this codebase yet. This is why `retryMpesaPayment()` creates a **new** Payment document instead of mutating the failed one — the Payment collection itself is the only durable record of what was attempted.
+- **`reversePayment()` is the only `AuditLog` write in this module.** A `PAYMENT_REVERSED` entry is written via `auditService.logAudit()` (see `doc/modules/AUDIT_DOCUMENTATION.md`). `retryMpesaPayment()` still isn't audited — it creates a **new** Payment document instead of mutating the failed one, and the Payment collection itself remains the only durable record of what was attempted there.
 - **Payment reversal is narrower than it looks.** `reversePayment()` is blocked once the tab it belongs to has reached `completed` (stock already deducted, no refund path exists) and once the tab's shift has `closed` (its cash reconciliation already ran against `salesSummary`). Because a single full payment finishes the tab in the same request that completes it, `reversePayment()` is realistically only usable in the partial/mixed-payment window — e.g. undoing a wrong cash tender before an M-Pesa top-up finishes the sale.
 - **Notifications on mpesa outcomes.** `completeMpesaPayment()` and `failMpesaPayment()` (the private handlers `mpesaCallback`/`getMpesaPaymentStatus` funnel through) each call `notificationService.createNotification()` — `payment_success` / `mpesa_failed` — addressed to `payment.processedBy`, the cashier who took the payment. Cash payments don't get one; they're synchronous, so there's nothing async to confirm. This is also this module's first real-time Socket.io traffic: notifications push to the recipient's `user_{userId}` room. See `doc/modules/NOTIFICATION_DOCUMENTATION.md`.
 - **Branch/shift are derived from the Tab, not the requesting user.** A cashier's own `currentShift` isn't necessarily the shift that opened the tab (a tab opened by a bartender may be closed out by a different cashier later in the same shift, or after a shift handover), so every payment inherits `tab.branch`/`tab.shift` directly.
@@ -338,7 +338,7 @@ export const retryMpesaPayment = async (req: Request, res: Response, next: NextF
 **Purpose:** Reverse a completed cash or M-Pesa payment
 **Access:** Manager, Admin
 **Validation:** `reversedReason` is required; the service further enforces `payment.status === 'completed'`, `tab.status !== 'completed'`, and `shift.status !== 'closed'`
-**Process:** Delegates to `paymentService.reversePayment` — marks the payment `reversed`, decrements `tab.amountPaid`/recomputes `balanceDue`, and decrements the matching `salesSummary.<method>Sales` counter
+**Process:** Delegates to `paymentService.reversePayment` — marks the payment `reversed`, writes a `PAYMENT_REVERSED` `AuditLog` entry via `auditService.logAudit` (`before`/`after` status, `ipAddress` threaded from `req.ip`), decrements `tab.amountPaid`/recomputes `balanceDue`, and decrements the matching `salesSummary.<method>Sales` counter — see `doc/modules/AUDIT_DOCUMENTATION.md`
 **Response:** Reversed payment
 
 **Controller Implementation:**
@@ -357,7 +357,8 @@ export const reversePayment = async (req: Request, res: Response, next: NextFunc
     const payment = await reversePaymentService(
       req.params.paymentId as string,
       req.user?._id as any,
-      reversedReason
+      reversedReason,
+      req.ip
     );
 
     // Return reversed payment
