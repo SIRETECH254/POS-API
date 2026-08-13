@@ -833,9 +833,10 @@ interface ITransfer {
 - `deactivateBranch()`
 - `getBranchSummary()` — quick stats card (staff count, open tabs, today's revenue) for the branch switcher UI
 
-### 5. Dashboard Controller — `dashboardController.ts`
+### 5. Dashboard Controller — `dashboardController.ts` *(implemented)*
 - `getBartenderDashboard()` — open tabs, today's sales, low stock, pending M-Pesa (all scoped to the bartender's branch)
 - `getManagerDashboard()` — revenue, profit, stock value, best sellers, open tabs, staff online, for the manager's branch (or a consolidated view across branches for admins)
+> No dedicated model — pure aggregation, reusing `reportingService.ts`'s existing helpers plus two new ones (`getLowStockItems`, `getInventorySummary`). Always "today," no range param. See `doc/modules/DASHBOARD_DOCUMENTATION.md`.
 
 ### 6. Category Controller — `categoryController.ts`
 - `createCategory()`
@@ -1089,12 +1090,13 @@ PATCH  /:branchId/deactivate      // admin only
 GET    /:branchId/summary
 ```
 
-### Dashboard Routes
+### Dashboard Routes *(implemented)*
 **Base:** `/api/dashboard`
 ```
-GET    /bartender
-GET    /manager
+GET    /bartender    // bartender, cashier, manager, admin
+GET    /manager      // manager, admin; ?branch= admin-only, ignored for managers
 ```
+See `doc/modules/DASHBOARD_DOCUMENTATION.md`.
 
 ### Category Routes
 **Base:** `/api/categories`

@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import Payment from "../../models/Payment";
 import Tab from "../../models/Tab";
 import Expense from "../../models/Expense";
+import Product from "../../models/Product";
 
 export type ReportRange = "today" | "yesterday" | "weekly" | "monthly" | "yearly";
 
@@ -209,4 +210,113 @@ export const getBestSellingProducts = async ({
   ]);
 
   return rows;
+};
+
+interface InventoryRow {
+  product: Types.ObjectId;
+  productName: string;
+  sku: Types.ObjectId;
+  skuCode: string;
+  currentStock: number;
+  minimumStock: number;
+  buyingPrice: number;
+  stockValue: number;
+  lowStock: boolean;
+}
+
+/**
+ * Walks every active SKU on every active Product, computing branch-scoped
+ * (or all-branch-summed) stock figures. Shared by getLowStockItems and
+ * getInventorySummary — mirrors reportController.getInventoryReport's own
+ * per-SKU loop, kept separate from it since that report needs a full row
+ * per item regardless of stock level, not just the low/summary slices these
+ * two need.
+ */
+const getInventoryRows = async (branch?: string | Types.ObjectId): Promise<InventoryRow[]> => {
+  const products = await Product.find({ status: "active" });
+  const rows: InventoryRow[] = [];
+
+  for (const product of products) {
+    for (const sku of product.skus) {
+      if (!sku.isActive) {
+        continue;
+      }
+
+      let currentStock = 0;
+      let minimumStock = 0;
+      if (branch) {
+        const branchStock = sku.stockByBranch.find((s: any) => s.branch.toString() === branch.toString());
+        currentStock = branchStock?.currentStock || 0;
+        minimumStock = branchStock?.minimumStock || 0;
+      } else {
+        currentStock = sku.stockByBranch.reduce((sum: number, s: any) => sum + s.currentStock, 0);
+        minimumStock = sku.stockByBranch.reduce((sum: number, s: any) => sum + s.minimumStock, 0);
+      }
+
+      rows.push({
+        product: product._id as Types.ObjectId,
+        productName: product.name,
+        sku: sku._id as Types.ObjectId,
+        skuCode: sku.skuCode,
+        currentStock,
+        minimumStock,
+        buyingPrice: sku.buyingPrice,
+        stockValue: currentStock * sku.buyingPrice,
+        lowStock: currentStock <= minimumStock,
+      });
+    }
+  }
+
+  return rows;
+};
+
+export interface LowStockItem {
+  product: Types.ObjectId;
+  productName: string;
+  sku: Types.ObjectId;
+  skuCode: string;
+  currentStock: number;
+  minimumStock: number;
+}
+
+/**
+ * Active SKUs at or below their branch minimum. Used by the Dashboard
+ * module's low-stock widget.
+ */
+export const getLowStockItems = async ({
+  branch,
+  limit = 10,
+}: {
+  branch?: string | Types.ObjectId;
+  limit?: number;
+}): Promise<{ items: LowStockItem[]; count: number }> => {
+  const rows = await getInventoryRows(branch);
+  const low = rows.filter((row) => row.lowStock);
+
+  return {
+    items: low.slice(0, limit).map((row) => ({
+      product: row.product,
+      productName: row.productName,
+      sku: row.sku,
+      skuCode: row.skuCode,
+      currentStock: row.currentStock,
+      minimumStock: row.minimumStock,
+    })),
+    count: low.length,
+  };
+};
+
+/**
+ * Total stock value and low-stock count across the active catalog. Used by
+ * the Dashboard module's manager view.
+ */
+export const getInventorySummary = async (
+  branch?: string | Types.ObjectId
+): Promise<{ totalStockValue: number; lowStockCount: number }> => {
+  const rows = await getInventoryRows(branch);
+
+  return {
+    totalStockValue: rows.reduce((sum, row) => sum + row.stockValue, 0),
+    lowStockCount: rows.filter((row) => row.lowStock).length,
+  };
 };
